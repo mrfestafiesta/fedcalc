@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2025 Federal Tax Calculator (AGI → Tax)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 24px; background: #0b0c10; color: #e9eef3; }
+    .card { background: #11151a; border: 1px solid #222a33; border-radius: 16px; padding: 20px; max-width: 880px; }
+    h1 { margin: 0 0 14px; font-size: 1.4rem; }
+    label { display: block; margin: 12px 0 6px; font-weight: 600; }
+    input, select, button {
+      padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3340; background: #0f1318; color: #e9eef3;
+    }
+    input, select { width: 100%; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { background: #2c7be5; border-color: #2c7be5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { padding: 10px; border-bottom: 1px solid #233042; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    .muted { color: #a3b1c2; font-size: 0.92rem; }
+    .total { font-weight: 800; }
+    .pill { display:inline-block; padding: 4px 8px; border:1px solid #2a3340; border-radius:999px; font-size:.85rem; color:#b8c5d6;}
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .small { font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>2025 Federal Tax Calculator</h1>
+    <p class="muted small">Enter <strong>AGI</strong>, pick a filing status, and we’ll subtract the 2025 standard deduction to get taxable income. Then we’ll show tax owed in each bracket and the total.</p>
+
+    <div class="row">
+      <div>
+        <label for="status">Filing status</label>
+        <select id="status">
+          <option value="single">Single</option>
+          <option value="mfj">Married Filing Jointly</option>
+          <option value="hoh">Head of Household</option>
+          <option value="mfs">Married Filing Separately</option>
+        </select>
+      </div>
+      <div>
+        <label for="agi">AGI (USD)</label>
+        <input id="agi" type="number" min="0" step="1" placeholder="e.g., 125000" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="calcBtn">Calculate</button>
+      <span class="pill" id="stdDeductionPill">Standard deduction: —</span>
+    </div>
+
+    <div id="results"></div>
+
+    <p class="muted small" style="margin-top:16px">
+      Based on updated numbers from HR1, One Big Beautiful Bill Act. Credit Michael Festa
+    </p>
+  </div>
+
+  <script>
+    // 2025 Standard deductions (IRS Rev. Proc. 2024-40)
+    const STD_DED = {
+      single: 15000,
+      mfs:    15000,
+      mfj:    30000,
+      hoh:    22500,
+    };
+
+    // 2025 brackets by filing status (taxable income thresholds, dollars)
+    // Each bracket: { upTo: number | Infinity, rate: decimal }
+    const BRACKETS_2025 = {
+      single: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfj: [
+        { upTo: 23850, rate: 0.10 },
+        { upTo: 96950, rate: 0.12 },
+        { upTo: 206700, rate: 0.22 },
+        { upTo: 394600, rate: 0.24 },
+        { upTo: 501050, rate: 0.32 },
+        { upTo: 751600, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      hoh: [
+        { upTo: 17000, rate: 0.10 },
+        { upTo: 64850, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250500, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfs: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 375800, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+    };
+
+    function fmt(n){ return n.toLocaleString(undefined,{maximumFractionDigits:0}); }
+    function money(n){ return '$' + n.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function ratePct(r){ return (r*100).toFixed(0) + '%'; }
+
+    function computeTaxByBracket(taxable, brackets) {
+      let remaining = Math.max(0, taxable);
+      let priorCap = 0;
+      const rows = [];
+      for (const b of brackets) {
+        const cap = b.upTo;
+        const slice = Math.max(0, Math.min(remaining, cap - priorCap));
+        const tax = slice * b.rate;
+        rows.push({ range: [priorCap, cap], rate: b.rate, amountTaxed: slice, tax });
+        remaining -= slice;
+        priorCap = cap;
+        if (remaining <= 0) break;
+      }
+      const total = rows.reduce((s,r)=>s+r.tax,0);
+      return { rows, total };
+    }
+
+    function render(status, agi) {
+      const stdDed = STD_DED[status];
+      document.getElementById('stdDeductionPill').textContent = `Standard deduction: ${money(stdDed)}`;
+
+      const taxable = Math.max(0, (Number(agi)||0) - stdDed);
+      const { rows, total } = computeTaxByBracket(taxable, BRACKETS_2025[status]);
+
+      const rowsHtml = rows.map(r => {
+        const lo = r.range[0], hi = r.range[1];
+        const label = isFinite(hi)
+          ? `${money(lo)} – ${money(hi)}`
+          : `${money(lo)}+`;
+        return `<tr>
+          <td>${label}</td>
+          <td>${ratePct(r.rate)}</td>
+          <td>${money(r.amountTaxed)}</td>
+          <td>${money(r.tax)}</td>
+        </tr>`;
+      }).join('');
+
+      const html = `
+        <div class="grid2">
+          <div><span class="muted">AGI:</span> <strong>${money(Number(agi)||0)}</strong></div>
+          <div><span class="muted">Taxable income (AGI − std. deduction):</span> <strong>${money(taxable)}</strong></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Bracket range (taxable)</th>
+              <th>Rate</th>
+              <th>Amount taxed in bracket</th>
+              <th>Tax from bracket</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr class="total">
+              <td colspan="3" style="text-align:right">Total federal income tax (v1):</td>
+              <td>${money(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+      document.getElementById('results').innerHTML = html;
+    }
+
+    const statusEl = document.getElementById('status');
+    const agiEl = document.getElementById('agi');
+    document.getElementById('calcBtn').addEventListener('click', () => render(statusEl.value, agiEl.value));
+    // Live updates for convenience
+    statusEl.addEventListener('change', () => render(statusEl.value, agiEl.value));
+    agiEl.addEventListener('input', () => render(statusEl.value, agiEl.value));
+
+    // initial
+    render(statusEl.value, agiEl.value);
+  </script>
+</body>
+</html>
