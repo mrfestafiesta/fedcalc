@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2025 Federal Tax Calculator — Self‑Employment Tax (Clean UI + Dividers + Currency)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 24px; background: #0b0c10; color: #e9eef3; }
+    .card { background: #11151a; border: 1px solid #222a33; border-radius: 16px; padding: 20px; max-width: 1060px; }
+    h1 { margin: 0 0 14px; font-size: 1.45rem; }
+    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    input, select, button { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3340; background: #0f1318; color: #e9eef3; }
+    input[readonly]{ background:#0c1015; color:#bcd0e0; }
+    input { width: 100%; box-sizing: border-box; }
+    select { width: 100%; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (min-width: 980px){ .row4 { grid-template-columns: repeat(4, 1fr); } }
+
+    .twoCol { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .stack { display:grid; grid-auto-rows: minmax(0, auto); gap: 14px; }
+    .span2 { grid-column: 1 / span 2; }
+
+    .threeLine { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+    .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { background: #2c7be5; border-color: #2c7be5; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px; border-bottom: 1px solid #233042; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+
+    .muted { color: #a3b1c2; font-size: 0.92rem; }
+    .small { font-size: .9rem; }
+    .pill { display:inline-block; padding: 4px 8px; border:1px solid #2a3340; border-radius:999px; font-size:.85rem; color:#b8c5d6; }
+    .total { font-weight: 800; }
+    .kpi { background:#0d131a; border:1px solid #223044; border-radius:12px; padding:12px; }
+
+    .divider { display:flex; align-items:center; gap:12px; color:#a3b1c2; margin: 14px 0 8px; }
+    .divider::before, .divider::after { content:""; height:1px; background:#233042; flex:1; }
+    .divider span { white-space:nowrap; font-size:.9rem; letter-spacing:.02em; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>2025 Federal Tax Calculator</h1>
+    <p class="muted small">AGI includes the <strong>½ self‑employment (SE) tax deduction</strong>. Social Security SE tax is capped at the 2025 wage base, reduced by your W‑2 Social Security wages (Box 3). Medicare SE tax has no cap. Additional Medicare surtax (0.9%) is not modeled.</p>
+
+    <!-- Filing status + AGI (computed) -->
+    <div class="row">
+      <div>
+        <label for="status">Filing status</label>
+        <select id="status">
+          <option value="single">Single</option>
+          <option value="mfj">Married Filing Jointly</option>
+          <option value="hoh">Head of Household</option>
+          <option value="mfs">Married Filing Separately</option>
+        </select>
+      </div>
+      <div>
+        <label for="agi">AGI (computed, after ½ SE tax)</label>
+        <input id="agi" type="text" readonly />
+      </div>
+    </div>
+
+    <!-- Income sources that feed AGI (pre 1/2 SE deduction) -->
+    <div class="row4" style="margin-top:8px">
+      <div>
+        <label for="w2">W‑2 (Employee Wages)</label>
+        <input id="w2" type="text" placeholder="e.g., $95,000" />
+      </div>
+      <div>
+        <label for="nec">1099‑NEC (Self Employment)</label>
+        <input id="nec" type="text" placeholder="e.g., $18,000" />
+      </div>
+      <div>
+        <label for="int">1099‑INT (Interest)</label>
+        <input id="int" type="text" placeholder="e.g., $450" />
+      </div>
+      <div>
+        <label for="div">1099‑DIV (Dividends)</label>
+        <input id="div" type="text" placeholder="e.g., $1,200" />
+      </div>
+    </div>
+
+    <!-- Self‑Employment Workup -->
+    <h2 style="margin-top:18px">Self‑Employment (Schedule SE) Workup</h2>
+    <div class="twoCol">
+      <!-- LEFT: stacked -->
+      <div class="stack">
+        <div>
+          <label for="expenses">Expenses</label>
+          <input id="expenses" type="text" placeholder="e.g., $5,000" />
+        </div>
+        <div>
+          <label for="netSe">Net Self‑Employment Income</label>
+          <input id="netSe" type="text" readonly />
+        </div>
+        <div>
+          <label for="ficaDed">FICA Deduction (7.65%)</label>
+          <input id="ficaDed" type="text" readonly />
+        </div>
+        <div>
+          <label for="seTaxable">Self‑Employment Taxable Income</label>
+          <input id="seTaxable" type="text" readonly />
+        </div>
+      </div>
+
+      <!-- RIGHT: W‑2 SS wages full width -->
+      <div>
+        <div class="span2">
+          <label for="w2ss">W‑2 Social Security wages (Box 3)</label>
+          <input id="w2ss" type="text" placeholder="e.g., $120,000" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider: Calculation of SE Tax -->
+    <div class="divider"><span>Calculation of SE Tax</span></div>
+
+    <!-- Straight line: SS | Medicare | SE Tax KPI -->
+    <div class="threeLine">
+      <div>
+        <label for="ssTax">Social Security (12.4%)</label>
+        <input id="ssTax" type="text" readonly />
+      </div>
+      <div>
+        <label for="medicareTax">Medicare (2.9%)</label>
+        <input id="medicareTax" type="text" readonly />
+      </div>
+      <div>
+        <div class="kpi">
+          <span class="muted">Self‑Employment Tax:</span><br>
+          <strong id="seTaxDisplay">$0.00</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider: Deductions -->
+    <div class="divider"><span>Deductions</span></div>
+
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label for="halfSe">½ SE Tax Deduction (reduces AGI)</label>
+        <input id="halfSe" type="text" readonly />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="calcBtn">Calculate</button>
+      <span class="pill" id="stdDeductionPill">Standard deduction: —</span>
+      <span class="pill" id="ssBasePill">SS wage base (2025): —</span>
+    </div>
+
+    <!-- Divider: Tax Bracket Breakdown -->
+    <div class="divider"><span>Tax Bracket Breakdown</span></div>
+    <div id="results"></div>
+
+    <!-- Divider: Summary of Taxes -->
+    <div class="divider"><span>Summary of Taxes</span></div>
+    <div class="twoCol">
+      <div>
+        <label for="fedTaxOwed">Total Federal Income Tax Owed</label>
+        <input id="fedTaxOwed" type="text" readonly />
+      </div>
+      <div>
+        <label for="seTaxOwed">Total Self‑Employment Tax Owed</label>
+        <input id="seTaxOwed" type="text" readonly />
+      </div>
+    </div>
+    <div class="stack" style="margin-top:8px">
+      <div>
+        <div class="kpi">
+          <span class="muted">Total Taxes Owed:</span><br>
+          <strong id="totalTaxesDisplay">$0.00</strong>
+        </div>
+      </div>
+    </div>
+
+    <p class="muted small" style="margin-top:16px">
+      Based on updated numbers from HR1, One Big Beautiful Bill Act. Credit Michael Festa
+    </p>
+  </div>
+
+  <script>
+    // === Constants ===
+    const STD_DED = { single: 15750, mfs: 15750, mfj: 31500, hoh: 23625 }; // OBBB Act 2025
+
+    const BRACKETS_2025 = {
+      single: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfj: [
+        { upTo: 23850, rate: 0.10 },
+        { upTo: 96950, rate: 0.12 },
+        { upTo: 206700, rate: 0.22 },
+        { upTo: 394600, rate: 0.24 },
+        { upTo: 501050, rate: 0.32 },
+        { upTo: 751600, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      hoh: [
+        { upTo: 17000, rate: 0.10 },
+        { upTo: 64850, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250500, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfs: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 375800, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+    };
+
+    const SS_WAGE_BASE_2025 = 176100; // Social Security wage base
+    const SS_RATE = 0.124;            // 12.4%
+    const MEDICARE_RATE = 0.029;      // 2.9%
+    const FICA_DEDUCTION_RATE = 0.0765; // 7.65%
+    const NET_EARNINGS_FACTOR = 1 - FICA_DEDUCTION_RATE; // 0.9235
+
+    // === Currency utils ===
+    const money = (n) => '$' + (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+    const parseMoney = (s) => {
+      if (s == null) return 0;
+      const cleaned = String(s).replace(/[^0-9.-]/g,'');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
+    const setMoneyInput = (id, value) => { document.getElementById(id).value = money(value); };
+    const getMoneyInput = (id) => parseMoney(document.getElementById(id).value);
+
+    // === Tax helpers ===
+    function ratePct(r){ return (r*100).toFixed(2).replace(/\.00$/, '') + '%'; }
+
+    function computeTaxByBracket(taxable, brackets) {
+      let remaining = Math.max(0, taxable);
+      let priorCap = 0;
+      const rows = [];
+      for (const b of brackets) {
+        const cap = b.upTo;
+        const slice = Math.max(0, Math.min(remaining, cap - priorCap));
+        const tax = slice * b.rate;
+        rows.push({ range: [priorCap, cap], rate: b.rate, amountTaxed: slice, tax });
+        remaining -= slice;
+        priorCap = cap;
+        if (remaining <= 0) break;
+      }
+      const total = rows.reduce((s,r)=>s+r.tax,0);
+      return { rows, total };
+    }
+
+    let w2ssTouched = false; // stop auto‑sync once user edits Box 3
+
+    function seWorkup({ nec, expenses, w2ss }){
+      const netSe = (nec) - (expenses); // can be negative
+      const ficaDed = Math.max(0, netSe) * FICA_DEDUCTION_RATE; // only if positive net
+      const seTaxable = Math.max(0, netSe * NET_EARNINGS_FACTOR);
+
+      const w2SsUsed = Math.min(Math.max(0, w2ss), SS_WAGE_BASE_2025);
+      const ssBaseRemaining = Math.max(0, SS_WAGE_BASE_2025 - w2SsUsed);
+      const ssPortionBase = Math.min(seTaxable, ssBaseRemaining);
+      const ssTax = ssPortionBase * SS_RATE;
+
+      const medicareTax = seTaxable * MEDICARE_RATE;
+
+      const seTaxTotal = ssTax + medicareTax;
+      const halfSe = seTaxTotal / 2;
+
+      return { netSe, ficaDed, seTaxable, ssTax, medicareTax, seTaxTotal, halfSe };
+    }
+
+    function render(){
+      const status = document.getElementById('status').value;
+      const w2  = getMoneyInput('w2');
+      const nec = getMoneyInput('nec');
+      const intr= getMoneyInput('int');
+      const div = getMoneyInput('div');
+      const expenses = getMoneyInput('expenses');
+
+      // Auto‑populate W‑2 SS wages from W‑2 unless user has overridden it
+      const w2ssEl = document.getElementById('w2ss');
+      if (!w2ssTouched) {
+        setMoneyInput('w2ss', w2);
+      }
+      const w2ss = getMoneyInput('w2ss');
+
+      const se = seWorkup({ nec, expenses, w2ss });
+
+      // Fill SE fields (formatted)
+      setMoneyInput('netSe', se.netSe);
+      setMoneyInput('ficaDed', se.ficaDed);
+      setMoneyInput('seTaxable', se.seTaxable);
+      setMoneyInput('ssTax', se.ssTax);
+      setMoneyInput('medicareTax', se.medicareTax);
+      document.getElementById('seTaxDisplay').textContent = money(se.seTaxTotal||0);
+      setMoneyInput('halfSe', se.halfSe);
+
+      // AGI = W‑2 + (NEC − Expenses) + INT + DIV − 1/2 SE tax
+      const agiAfterHalfSE = w2 + (nec - expenses) + intr + div - se.halfSe;
+      document.getElementById('agi').value = money(agiAfterHalfSE);
+
+      // Taxable income = max(0, AGI - standard deduction)
+      const stdDed = STD_DED[status];
+      document.getElementById('stdDeductionPill').textContent = `Standard deduction: ${money(stdDed)}`;
+      document.getElementById('ssBasePill').textContent = `SS wage base (2025): ${money(SS_WAGE_BASE_2025)}`;
+
+      const taxable = Math.max(0, agiAfterHalfSE - stdDed);
+      const { rows, total } = computeTaxByBracket(taxable, BRACKETS_2025[status]);
+
+      const rowsHtml = rows.map(r => {
+        const lo = r.range[0], hi = r.range[1];
+        const label = isFinite(hi) ? `${money(lo)} – ${money(hi)}` : `${money(lo)}+`;
+        return `<tr>
+          <td>${label}</td>
+          <td>${ratePct(r.rate)}</td>
+          <td>${money(r.amountTaxed)}</td>
+          <td>${money(r.tax)}</td>
+        </tr>`;
+      }).join('');
+
+      const html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Bracket range (taxable)</th>
+              <th>Rate</th>
+              <th>Amount taxed in bracket</th>
+              <th>Tax from bracket</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr class="total">
+              <td colspan="3" style="text-align:right">Total Federal Income Tax</td>
+              <td>${money(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+      document.getElementById('results').innerHTML = html;
+
+      // Summary of Taxes section
+      setMoneyInput('fedTaxOwed', total);
+      setMoneyInput('seTaxOwed', se.seTaxTotal||0);
+      const totalTaxes = total + (se.seTaxTotal||0);
+      document.getElementById('totalTaxesDisplay').textContent = money(totalTaxes);
+    }
+
+    // Format inputs on blur; allow free typing on focus
+    const currencyIds = ['w2','nec','int','div','expenses','w2ss'];
+    currencyIds.forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('focus', () => { el.value = parseMoney(el.value) || ''; });
+      el.addEventListener('blur', () => { el.value = money(parseMoney(el.value)); render(); });
+      el.addEventListener('input', () => { /* live render using parsed numeric */ render(); });
+    });
+
+    // Detect manual override of W‑2 SS wages
+    document.getElementById('w2ss').addEventListener('input', () => { w2ssTouched = true; });
+
+    // Other events
+    document.getElementById('status').addEventListener('change', render);
+    document.getElementById('calcBtn').addEventListener('click', render);
+
+    // initial: seed blanks with $0.00 for cleanliness
+    ['agi','w2','nec','int','div','expenses','w2ss','netSe','ficaDed','seTaxable','ssTax','medicareTax','halfSe','fedTaxOwed','seTaxOwed'].forEach(id => setMoneyInput(id, 0));
+    render();
+  </script>
+</body>
+</html>
