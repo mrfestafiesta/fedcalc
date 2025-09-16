@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2025 Federal Tax Planner</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 24px; background: #0b0c10; color: #e9eef3; }
+    .card { background: #11151a; border: 1px solid #222a33; border-radius: 16px; padding: 20px; max-width: 1060px; }
+    h1 { margin: 0 0 14px; font-size: 1.45rem; }
+    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    input, select { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3340; background: #0f1318; color: #e9eef3; }
+    input[readonly]{ background:#0c1015; color:#bcd0e0; }
+    input { width: 100%; box-sizing: border-box; }
+    select { width: 100%; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (min-width: 980px){ .row4 { grid-template-columns: repeat(4, 1fr); } }
+
+    .twoCol { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .alignEnd { align-items:end; }
+    .stack { display:grid; grid-auto-rows: minmax(0, auto); gap: 14px; }
+    .span2 { grid-column: 1 / span 2; }
+
+    .threeLine { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px; border-bottom: 1px solid #233042; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+
+    .muted { color: #a3b1c2; font-size: 0.92rem; }
+    .small { font-size: .9rem; }
+    .pill { display:inline-block; padding: 4px 8px; border:1px solid #2a3340; border-radius:999px; font-size:.85rem; color:#b8c5d6; }
+    .total { font-weight: 800; }
+    .kpi { background:#0d131a; border:1px solid #223044; border-radius:12px; padding:12px; }
+
+    .divider { display:flex; align-items:center; gap:12px; color:#a3b1c2; margin: 14px 0 8px; }
+    .divider::before, .divider::after { content:""; height:1px; background:#233042; flex:1; }
+    .divider span { white-space:nowrap; font-size:.9rem; letter-spacing:.02em; }
+
+    /* Filer toggles: exactly two lines each */
+    .toggles { display:flex; align-items:flex-start; gap:16px; justify-content:flex-start; }
+    .toggleBlock { display:inline-grid; grid-template-rows:auto auto; gap:2px; }
+    .toggleBlock .top { line-height:1; }
+    .toggleBlock .bottom { display:flex; align-items:center; gap:6px; line-height:1; }
+    .disabledText { color:#6f7b87; }
+
+    /* IRA row */
+    .iraRow { display:flex; align-items:center; gap:10px; }
+    #iraDed { width: 180px; }
+
+    /* Danger styling for red emphasis */
+    .dangerLabel { color:#f07a7a; }
+    .dangerInput { color:#f07a7a; border-color:#7a3f3f; font-weight:700; }
+    .dangerValue { color:#f07a7a; font-weight:800; }
+
+    .error { border-color:#d76969 !important; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>2025 Federal Tax Planner</h1>
+    <p class="muted small">Deductions modeled include <strong>½ self‑employment (SE) tax deduction</strong> and <strong>IRA deduction</strong>, based on filing status and age. Social Security tax is capped at the 2025 wage base. Additional Medicare tax (0.9%) is not modeled.</p>
+
+    <!-- Filing status and Filer age toggles -->
+    <div class="row">
+      <div>
+        <label for="status">Filing status</label>
+        <select id="status">
+          <option value="single">Single</option>
+          <option value="mfj">Married Filing Jointly</option>
+          <option value="hoh">Head of Household</option>
+          <option value="mfs">Married Filing Separately</option>
+        </select>
+      </div>
+      <div>
+        <label style="visibility:hidden">Ages</label>
+        <div class="toggles" style="height:42px;">
+          <div class="toggleBlock" id="age1Block">
+            <div class="top">Filer 1 over 50?</div>
+            <label class="bottom" id="age1Label"><input id="age50_1" type="checkbox" /></label>
+          </div>
+          <div class="toggleBlock" id="age2Block">
+            <div class="top">Filer 2 over 50?</div>
+            <label class="bottom" id="age2Label"><input id="age50_2" type="checkbox" /></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Income sources that feed AGI (pre adjustments) -->
+    <div class="row4" style="margin-top:8px">
+      <div>
+        <label for="w2">W‑2 (Employee Wages)</label>
+        <input id="w2" type="text" placeholder="e.g., $95,000" />
+      </div>
+      <div>
+        <label for="nec">1099‑NEC (Self Employment)</label>
+        <input id="nec" type="text" placeholder="e.g., $18,000" />
+      </div>
+      <div>
+        <label for="int">1099‑INT (Interest)</label>
+        <input id="int" type="text" placeholder="e.g., $450" />
+      </div>
+      <div>
+        <label for="div">1099‑DIV (Dividends)</label>
+        <input id="div" type="text" placeholder="e.g., $1,200" />
+      </div>
+    </div>
+
+    <!-- Self‑Employment Workup -->
+    <h2 style="margin-top:18px">Self‑Employment (Schedule SE) Workup</h2>
+    <div class="twoCol">
+      <!-- LEFT: stacked -->
+      <div class="stack">
+        <div>
+          <label for="expenses">Expenses</label>
+          <input id="expenses" type="text" placeholder="e.g., $5,000" />
+        </div>
+        <div>
+          <label for="netSe">Net Self‑Employment Income</label>
+          <input id="netSe" type="text" readonly />
+        </div>
+        <div>
+          <label for="ficaDed">FICA Deduction (7.65%)</label>
+          <input id="ficaDed" type="text" readonly />
+        </div>
+        <div>
+          <label for="seTaxable">Self‑Employment Taxable Income</label>
+          <input id="seTaxable" type="text" readonly />
+        </div>
+      </div>
+
+      <!-- RIGHT: W‑2 SS wages full width -->
+      <div>
+        <div class="span2">
+          <label for="w2ss">W‑2 Social Security wages (Box 3)</label>
+          <input id="w2ss" type="text" placeholder="e.g., $120,000" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider: Calculation of SE Tax -->
+    <div class="divider"><span>Calculation of SE Tax</span></div>
+
+    <!-- Straight line: SS | Medicare | SE Tax (now input-shaped + red) -->
+    <div class="threeLine">
+      <div>
+        <label for="ssTax">Social Security (12.4%)</label>
+        <input id="ssTax" type="text" readonly />
+        <div id="ssBaseNote" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
+      </div>
+      <div>
+        <label for="medicareTax">Medicare (2.9%)</label>
+        <input id="medicareTax" type="text" readonly />
+      </div>
+      <div>
+        <label class="dangerLabel" for="seTax">Self‑Employment Tax</label>
+        <input id="seTax" class="dangerInput" type="text" readonly />
+      </div>
+    </div>
+
+    <!-- Divider: Deductions -->
+    <div class="divider"><span>Deductions</span></div>
+
+    <div class="twoCol alignEnd" style="margin-top:8px">
+      <div>
+        <label for="halfSe">½ SE Tax Deduction</label>
+        <input id="halfSe" type="text" readonly />
+      </div>
+      <div>
+        <label for="iraDed">IRA Deduction</label>
+        <div class="iraRow">
+          <input id="iraDed" type="text" placeholder="$0" />
+          <span class="pill" id="iraMaxPill">Max: $7,000.00</span>
+        </div>
+        <div id="iraError" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label for="stdDeduction">Standard Deduction</label>
+        <input id="stdDeduction" type="text" readonly />
+      </div>
+      <div></div>
+    </div>
+
+    <!-- Divider: Tax Bracket Breakdown -->
+    <div class="divider"><span>Tax Bracket Breakdown</span></div>
+    <div id="results"></div>
+
+    <!-- Divider: Summary of Taxes -->
+    <div class="divider"><span>Summary of Taxes</span></div>
+    <div class="twoCol">
+      <div>
+        <label for="agiBox">Adjusted Gross Income (AGI)</label>
+        <input id="agiBox" type="text" readonly />
+      </div>
+      <div>
+        <label for="magiBox">Modified AGI (MAGI)</label>
+        <input id="magiBox" type="text" readonly />
+      </div>
+    </div>
+
+    <div class="twoCol" style="margin-top:8px">
+      <div>
+        <label class="dangerLabel" for="fedTaxOwed">Total Federal Income Tax Owed</label>
+        <input id="fedTaxOwed" class="dangerInput" type="text" readonly />
+      </div>
+      <div>
+        <label class="dangerLabel" for="seTaxOwed">Total Self‑Employment Tax Owed</label>
+        <input id="seTaxOwed" class="dangerInput" type="text" readonly />
+      </div>
+    </div>
+
+    <div class="stack" style="margin-top:8px">
+      <div>
+        <div class="kpi">
+          <span class="dangerLabel">Total Taxes Owed:</span><br>
+          <strong id="totalTaxesDisplay" class="dangerValue">$0.00</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider: Income → Outflows Visualization -->
+    <div class="divider"><span>Income → Outflows Visualization</span></div>
+    <div id="sankeyWrap" style="margin:8px 0 16px">
+      <div id="sankeyChart" style="width:100%; height:420px;"></div>
+      <p class="muted small">Shows inflows (left) and outflows (right): Federal Income Tax, Self‑Employment Tax, IRA savings, and Take‑home cash.</p>
+    </div>
+
+    <!-- Divider: Required Estimated Tax Payments -->
+    <div class="divider"><span>Required Estimated Tax Payments</span></div>
+    <div class="row4" style="margin-top:8px">
+      <div>
+        <label for="estQ1">Quarter 1: Due Apr 15</label>
+        <input id="estQ1" type="text" placeholder="$0" />
+      </div>
+      <div>
+        <label for="estQ2">Quarter 2: Due Jun 15</label>
+        <input id="estQ2" type="text" placeholder="$0" />
+      </div>
+      <div>
+        <label for="estQ3">Quarter 3: Due Sep 15</label>
+        <input id="estQ3" type="text" placeholder="$0" />
+      </div>
+      <div>
+        <label for="estQ4">Quarter 4: Due Jan 15</label>
+        <input id="estQ4" type="text" placeholder="$0" />
+      </div>
+    </div>
+    <p class="muted small">Warning: You could be subject to IRS penalties if your total estimated tax payments add up to less than 90% of your total tax liability.</p>
+
+  </div>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+
+  <script>
+    // === Constants ===
+    const STD_DED = { single: 15750, mfs: 15750, mfj: 31500, hoh: 23625 }; // OBBB Act 2025
+
+    const BRACKETS_2025 = {
+      single: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfj: [
+        { upTo: 23850, rate: 0.10 },
+        { upTo: 96950, rate: 0.12 },
+        { upTo: 206700, rate: 0.22 },
+        { upTo: 394600, rate: 0.24 },
+        { upTo: 501050, rate: 0.32 },
+        { upTo: 751600, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      hoh: [
+        { upTo: 17000, rate: 0.10 },
+        { upTo: 64850, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250500, rate: 0.32 },
+        { upTo: 626350, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+      mfs: [
+        { upTo: 11925, rate: 0.10 },
+        { upTo: 48475, rate: 0.12 },
+        { upTo: 103350, rate: 0.22 },
+        { upTo: 197300, rate: 0.24 },
+        { upTo: 250525, rate: 0.32 },
+        { upTo: 375800, rate: 0.35 },
+        { upTo: Infinity, rate: 0.37 },
+      ],
+    };
+
+    const SS_WAGE_BASE_2025 = 176100; // Social Security wage base
+    const SS_RATE = 0.124;            // 12.4%
+    const MEDICARE_RATE = 0.029;      // 2.9%
+    const FICA_DEDUCTION_RATE = 0.0765; // 7.65%
+    const NET_EARNINGS_FACTOR = 1 - FICA_DEDUCTION_RATE; // 0.9235
+
+    // === Google Charts (Sankey) bootstrap ===
+    let googleSankeyReady = false;
+    let lastSankeyRows = null;
+
+    function bootSankey() {
+      if (window.google && google.charts) {
+        google.charts.load('current', { packages: ['sankey'] });
+        google.charts.setOnLoadCallback(function(){
+          googleSankeyReady = true;
+          if (lastSankeyRows) drawSankey(lastSankeyRows);
+        });
+      }
+    }
+    // Try immediately, and again once window finishes loading
+    bootSankey();
+    window.addEventListener('load', bootSankey);
+
+    function drawSankey(rows){
+      try {
+        const el = document.getElementById('sankeyChart');
+        if (!el || !window.google || !google.visualization || !google.visualization.DataTable) return;
+        const data = new google.visualization.DataTable();
+        data.addColumn('string','From');
+        data.addColumn('string','To');
+        data.addColumn('number','Value');
+        data.addRows(rows);
+        const chart = new google.visualization.Sankey(el);
+        const options = {
+          backgroundColor: 'transparent',
+          sankey: {
+            node: { label: { color: '#e9eef3' }, nodePadding: 18 },
+            link: { colorMode: 'gradient' }
+          }
+        };
+        chart.draw(data, options);
+      } catch(e) { /* keep app running even if chart errs */ }
+    }
+
+    // === IRA limit helper ===
+    // MFJ uses two per-person limits (each $7k or $8k if 50+). Others use Filer 1 only.
+    const iraLimit = (status, age1, age2) => {
+      const one = age1 ? 8000 : 7000;
+      if (status === 'mfj') {
+        const two = age2 ? 8000 : 7000;
+        return one + two;
+      }
+      return one;
+    };
+
+    // === Currency utils ===
+    const money = (n) => '$' + (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+    const parseMoney = (s) => {
+      if (s == null) return 0;
+      const cleaned = String(s).replace(/[^0-9.-]/g,'');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
+    const setMoneyInput = (id, value) => { const el = document.getElementById(id); if(el) el.value = money(value); };
+    const getMoneyInput = (id) => parseMoney(document.getElementById(id).value);
+
+    // === Tax helpers ===
+    function ratePct(r){ return (r*100).toFixed(2).replace(/\.00$/, '') + '%'; }
+
+    function computeTaxByBracket(taxable, brackets) {
+      let remaining = Math.max(0, taxable);
+      let priorCap = 0;
+      const rows = [];
+      for (const b of brackets) {
+        const cap = b.upTo;
+        const slice = Math.max(0, Math.min(remaining, cap - priorCap));
+        const tax = slice * b.rate;
+        rows.push({ range: [priorCap, cap], rate: b.rate, amountTaxed: slice, tax });
+        remaining -= slice;
+        priorCap = cap;
+        if (remaining <= 0) break;
+      }
+      const total = rows.reduce((s,r)=>s+r.tax,0);
+      return { rows, total };
+    }
+
+    let w2ssTouched = false; // stop auto‑sync once user edits Box 3
+
+    function seWorkup({ nec, expenses, w2ss }){
+      const netSe = (nec) - (expenses); // can be negative
+      const ficaDed = Math.max(0, netSe) * FICA_DEDUCTION_RATE; // only if positive net
+      const seTaxable = Math.max(0, netSe * NET_EARNINGS_FACTOR);
+
+      const w2SsUsed = Math.min(Math.max(0, w2ss), SS_WAGE_BASE_2025);
+      const ssBaseRemaining = Math.max(0, SS_WAGE_BASE_2025 - w2SsUsed);
+      const ssPortionBase = Math.min(seTaxable, ssBaseRemaining);
+      const ssTax = ssPortionBase * SS_RATE;
+
+      const medicareTax = seTaxable * MEDICARE_RATE;
+
+      const seTaxTotal = ssTax + medicareTax;
+      const halfSe = seTaxTotal / 2;
+
+      return { netSe, ficaDed, seTaxable, ssTax, medicareTax, seTaxTotal, halfSe };
+    }
+
+    function render(){
+      const status = document.getElementById('status').value;
+      const age1El = document.getElementById('age50_1');
+      const age2El = document.getElementById('age50_2');
+      const age2Label = document.getElementById('age2Label');
+
+      // Disable/grey Filer 2 unless MFJ
+      if (status === 'mfj') {
+        age2El.disabled = false;
+        age2Label.classList.remove('disabledText');
+      } else {
+        age2El.checked = false;
+        age2El.disabled = true;
+        age2Label.classList.add('disabledText');
+      }
+
+      const age1 = age1El.checked;
+      const age2 = age2El.checked;
+
+      const w2  = getMoneyInput('w2');
+      const nec = getMoneyInput('nec');
+      const intr= getMoneyInput('int');
+      const div = getMoneyInput('div');
+      const expenses = getMoneyInput('expenses');
+      const iraDedInput = document.getElementById('iraDed');
+      let iraDed = getMoneyInput('iraDed');
+
+      // Auto‑populate W‑2 SS wages from W‑2 unless user has overridden it
+      if (!w2ssTouched) { setMoneyInput('w2ss', w2); }
+      const w2ss = getMoneyInput('w2ss');
+
+      // Update IRA limit pill and validate IRA input
+      const maxIra = iraLimit(status, age1, age2);
+      document.getElementById('iraMaxPill').textContent = `Max: ${money(maxIra)}`;
+      const iraErrEl = document.getElementById('iraError');
+      if (iraDed < 0) {
+        iraErrEl.textContent = 'IRA deduction cannot be negative.';
+        iraErrEl.style.display = 'block';
+        iraDedInput.classList.add('error');
+      } else if (iraDed > maxIra) {
+        iraErrEl.textContent = `Exceeds maximum allowed of ${money(maxIra)} for your filing status and age(s).`;
+        iraErrEl.style.display = 'block';
+        iraDedInput.classList.add('error');
+      } else {
+        iraErrEl.style.display = 'none';
+        iraDedInput.classList.remove('error');
+      }
+
+      const se = seWorkup({ nec, expenses, w2ss });
+
+      // Fill SE fields (formatted)
+      setMoneyInput('netSe', se.netSe);
+      setMoneyInput('ficaDed', se.ficaDed);
+      setMoneyInput('seTaxable', se.seTaxable);
+      setMoneyInput('ssTax', se.ssTax);
+      setMoneyInput('medicareTax', se.medicareTax);
+      setMoneyInput('seTax', se.seTaxTotal||0);
+
+      // SS wage base note when achieved or exceeded
+      const w2Used = Math.min(Math.max(0, w2ss), SS_WAGE_BASE_2025);
+      const ssRem = Math.max(0, SS_WAGE_BASE_2025 - w2Used);
+      const coveredBySE = Math.min(se.seTaxable, ssRem);
+      const baseAchieved = (w2Used + coveredBySE) >= SS_WAGE_BASE_2025;
+      const ssBaseNoteEl = document.getElementById('ssBaseNote');
+      if (baseAchieved) {
+        ssBaseNoteEl.textContent = `SS Wage Base of ${money(SS_WAGE_BASE_2025)} has been achieved. No additional SS Tax is due above that amount.`;
+        ssBaseNoteEl.style.display = 'block';
+      } else {
+        ssBaseNoteEl.style.display = 'none';
+      }
+
+      // ½ SE
+      setMoneyInput('halfSe', se.halfSe);
+
+      // AGI = W‑2 + (NEC − Expenses) + INT + DIV − 1/2 SE tax − IRA deduction (capped)
+      const agi = w2 + (nec - expenses) + intr + div - se.halfSe - Math.max(0, Math.min(iraDed, maxIra));
+
+      // Taxable income = max(0, AGI - standard deduction)
+      const stdDed = STD_DED[status];
+      setMoneyInput('stdDeduction', stdDed);
+
+      const { rows: bracketRows, total } = computeTaxByBracket(Math.max(0, agi - stdDed), BRACKETS_2025[status]);
+
+      const rowsHtml = bracketRows.map(r => {
+        const lo = r.range[0], hi = r.range[1];
+        const label = isFinite(hi) ? `${money(lo)} – ${money(hi)}` : `${money(lo)}+`;
+        return `<tr>
+          <td>${label}</td>
+          <td>${ratePct(r.rate)}</td>
+          <td>${money(r.amountTaxed)}</td>
+          <td>${money(r.tax)}</td>
+        </tr>`;
+      }).join('');
+
+      const html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Bracket range (taxable)</th>
+              <th>Rate</th>
+              <th>Amount taxed in bracket</th>
+              <th>Tax from bracket</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr class="total">
+              <td colspan="3" style="text-align:right">Total Federal Income Tax</td>
+              <td>${money(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+      document.getElementById('results').innerHTML = html;
+
+      // Summary of Taxes section
+      setMoneyInput('agiBox', agi);
+      const magi = agi + Math.max(0, Math.min(iraDed, maxIra)); // add back IRA to get simple MAGI for display
+      setMoneyInput('magiBox', magi);
+
+      setMoneyInput('fedTaxOwed', total);
+      setMoneyInput('seTaxOwed', se.seTaxTotal||0);
+      const totalTaxes = total + (se.seTaxTotal||0);
+      document.getElementById('totalTaxesDisplay').textContent = money(totalTaxes);
+      // Auto-calc estimated quarterly payments: total tax / 4, rounded up to nearest dollar
+      const perQuarter = Math.ceil(totalTaxes / 4);
+      setMoneyInput('estQ1', perQuarter);
+      setMoneyInput('estQ2', perQuarter);
+      setMoneyInput('estQ3', perQuarter);
+      setMoneyInput('estQ4', perQuarter);
+
+      // === Build Sankey data (inflows → total → outflows) ===
+      const iraUsed = Math.max(0, Math.min(iraDed, maxIra));
+      const netSelf = Math.max(0, (nec - expenses));
+      const sankeyRows = [];
+      if (w2 > 0) sankeyRows.push(['W‑2','Total Income', w2]);
+      if (netSelf > 0) sankeyRows.push(['Self‑Employment (net)','Total Income', netSelf]);
+      if (intr > 0) sankeyRows.push(['Interest','Total Income', intr]);
+      if (div > 0) sankeyRows.push(['Dividends','Total Income', div]);
+      sankeyRows.push(['Total Income','Federal Income Tax', total]);
+      sankeyRows.push(['Total Income','Self‑Employment Tax', se.seTaxTotal||0]);
+      sankeyRows.push(['Total Income','IRA Saving', iraUsed]);
+      const totalIncomeVis = w2 + netSelf + intr + div;
+      const takeHome = Math.max(0, totalIncomeVis - total - (se.seTaxTotal||0) - iraUsed);
+      sankeyRows.push(['Total Income','Take‑home Cash', takeHome]);
+      lastSankeyRows = sankeyRows;
+      if (googleSankeyReady) drawSankey(sankeyRows);
+    }
+
+    // Format inputs on blur; allow free typing on focus
+    const currencyIds = ['w2','nec','int','div','expenses','w2ss','iraDed','estQ1','estQ2','estQ3','estQ4'];
+    currencyIds.forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('focus', () => { el.value = parseMoney(el.value) || ''; });
+      el.addEventListener('blur', () => {
+        // On blur, clamp IRA deduction to [0, max]
+        if (id === 'iraDed') {
+          const status = document.getElementById('status').value;
+          const age1 = document.getElementById('age50_1').checked;
+          const age2 = document.getElementById('age50_2').checked;
+          const max = iraLimit(status, age1, age2);
+          let val = parseMoney(el.value);
+          if (val < 0) val = 0;
+          if (val > max) val = max;
+          el.value = money(val);
+          document.getElementById('iraError').style.display = 'none';
+          el.classList.remove('error');
+          render();
+          return;
+        }
+        el.value = money(parseMoney(el.value));
+        render();
+      });
+      el.addEventListener('input', () => { render(); });
+    });
+
+    // Detect manual override of W‑2 SS wages & age toggles
+    document.getElementById('w2ss').addEventListener('input', () => { w2ssTouched = true; });
+    document.getElementById('age50_1').addEventListener('change', render);
+    document.getElementById('age50_2').addEventListener('change', render);
+
+    // Other events
+    document.getElementById('status').addEventListener('change', render);
+
+    // initial: seed blanks with $0.00 for cleanliness
+    ['w2','nec','int','div','expenses','w2ss','iraDed','estQ1','estQ2','estQ3','estQ4','netSe','ficaDed','seTaxable','ssTax','medicareTax','seTax','halfSe','fedTaxOwed','seTaxOwed','agiBox','magiBox','stdDeduction'].forEach(id => { const el = document.getElementById(id); if(el) setMoneyInput(id, 0); });
+
+    // Simple sanity tests (non-blocking)
+    (function tests(){
+      const near=(a,b,eps=1e-2)=>Math.abs(a-b)<=eps;
+      const se=seWorkup({nec:10000, expenses:2000, w2ss:0});
+      console.assert(near(se.netSe,8000), 'SE net should be 8,000');
+      console.assert(near(se.seTaxable, 8000*(1-0.0765)), 'SE taxable ≈ net*0.9235');
+      const tb=computeTaxByBracket(0, BRACKETS_2025.single); console.assert(tb.total===0, 'Zero taxable → zero tax');
+    })();
+
+    render();
+  </script>
+</body>
+</html>
