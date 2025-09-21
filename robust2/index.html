@@ -121,12 +121,24 @@
         </div>
       </div>
 
-      <div class="divider"><span>1099 Income</span></div>
-      <div class="row5" style="margin-top:8px">
+      <div class="divider"><span>Self Employment Income</span></div>
+      <div class="row3" style="margin-top:8px">
         <div>
           <label for="nec">1099‑NEC</label>
           <input id="nec" type="text" placeholder="e.g., $18,000" />
         </div>
+        <div>
+          <label for="expenses">SE Expenses</label>
+          <input id="expenses" type="text" placeholder="e.g., $5,000" />
+        </div>
+        <div>
+          <label for="netSeTop">Net SE Income</label>
+          <input id="netSeTop" type="text" readonly />
+        </div>
+      </div>
+
+      <div class="divider"><span>Other 1099 Income</span></div>
+      <div class="row4" style="margin-top:8px">
         <div>
           <label for="int">1099‑INT</label>
           <input id="int" type="text" placeholder="e.g., $450" />
@@ -198,11 +210,7 @@
     <div class="labelHeader">Tax Calculations</div>
     <div class="sectionBox">
       <div class="divider"><span>Calculation of SE Tax</span></div>
-      <div class="row4" style="margin-top:8px">
-        <div>
-          <label for="expenses">SE Expenses</label>
-          <input id="expenses" type="text" placeholder="e.g., $5,000" />
-        </div>
+      <div class="row3" style="margin-top:8px">
         <div>
           <label for="netSe">Net SE Income</label>
           <input id="netSe" type="text" readonly />
@@ -439,10 +447,7 @@
         const chart = new google.visualization.Sankey(el);
         const options = {
           backgroundColor: 'transparent',
-          sankey: {
-            node: { label: { color: '#e9eef3' }, colors: nodeColors, nodePadding: 18 },
-            link: { colorMode: 'gradient' }
-          }
+          sankey: { node: { label: { color: '#e9eef3' }, colors: nodeColors, nodePadding: 18 }, link: { colorMode: 'gradient' } }
         };
         chart.draw(data, options);
       } catch(e) { /* ignore chart issues */ }
@@ -485,6 +490,7 @@
 
       // SE workup
       const se = seWorkup({ nec, expenses, w2_ss2: w2_ss2_val });
+      setMoneyInput('netSeTop', se.netSe);
       setMoneyInput('netSe', se.netSe);
       setMoneyInput('ficaDed', se.ficaDed);
       setMoneyInput('seTaxable', se.seTaxable);
@@ -508,7 +514,7 @@
       const taxable = Math.max(0, agi - stdDed);
       const { rows: brRows, total } = computeTaxByBracket(taxable, BRACKETS_2025[status]);
       const rowsHtml = brRows.map(r=>{ const lo=r.range[0], hi=r.range[1]; const label=isFinite(hi)?`${money(lo)} – ${money(hi)}`:`${money(lo)}+`; return `<tr><td>${label}</td><td>${ratePct(r.rate)}</td><td>${money(r.amountTaxed)}</td><td>${money(r.tax)}</td></tr>`; }).join('');
-      document.getElementById('results').innerHTML = `<table><thead><tr><th>Bracket range (taxable)</th><th>Rate</th><th>Amount taxed in bracket</th><th>Tax from bracket</th></tr></thead><tbody>${rowsHtml}</tbody><tfoot><tr class="total"><td colspan="3" style="text-align:right">Total Federal Income Tax</td><td>${money(total)}</td></tr></tfoot></table>`;
+      document.getElementById('results').innerHTML = `<table><thead><tr><th>Bracket range (taxable)</th><th>Rate</th><th>Amount taxed in bracket</th><th>Tax from bracket</th></tr></thead><tbody>${rowsHtml}</tbody><tfoot><tr class=\"total\"><td colspan=\"3\" style=\"text-align:right\">Total Federal Income Tax</td><td>${money(total)}</td></tr></tfoot></table>`;
 
       setMoneyInput('agiBox', agi);
       const magi = agi + iraUsed; setMoneyInput('magiBox', magi);
@@ -575,6 +581,8 @@
       el.addEventListener('input', (e) => {
         if (id === 'w2_ss2') w2SS2Touched = true;
         if (id === 'w2_med') w2MedTouched = true;
+        // Recompute on every keystroke so numbers feel live
+        render();
       });
     });
 
@@ -583,7 +591,7 @@
     document.getElementById('status').addEventListener('change', render);
 
     // Seed $0.00 for cleanliness
-    ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','seHealth','qbi','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4','netSe','ficaDed','seTaxable','ssTax','medicareTax','seTax','halfSe','w2FicaSSTax','w2FicaMedTax','w2FicaTotal','w2FicaTotalSummary','fedTaxOwed','seTaxOwed','agiBox','magiBox','stdDeduction'].forEach(id => { const el = document.getElementById(id); if(el) setMoneyInput(id, 0); });
+    ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','seHealth','qbi','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4','netSeTop','netSe','ficaDed','seTaxable','ssTax','medicareTax','seTax','halfSe','w2FicaSSTax','w2FicaMedTax','w2FicaTotal','w2FicaTotalSummary','fedTaxOwed','seTaxOwed','agiBox','magiBox','stdDeduction'].forEach(id => { const el = document.getElementById(id); if(el) setMoneyInput(id, 0); });
 
     // Tests
     (function tests(){
