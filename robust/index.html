@@ -7,7 +7,7 @@
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     body { margin: 24px; background: #0b0c10; color: #e9eef3; }
-    .card { background: #11151a; border: 1px solid #222a33; border-radius: 16px; padding: 20px; max-width: 1120px; }
+    .card { background: #11151a; border: 1px solid #222a33; border-radius: 16px; padding: 20px; max-width: 1120px; margin: 0 auto; }
     h1 { margin: 0 0 14px; font-size: 1.45rem; }
     label { display: block; margin: 10px 0 6px; font-weight: 600; }
     input, select { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3340; background: #0f1318; color: #e9eef3; }
@@ -43,6 +43,9 @@
     .divider::before, .divider::after { content:""; height:1px; background:#233042; flex:1; }
     .divider span { white-space:nowrap; font-size:.9rem; letter-spacing:.02em; }
 
+    .labelHeader { font-weight:700; font-size:1.5rem; line-height:1.2; margin:64px 0 12px; text-align:left; }
+    .sectionBox { background:#0d1116; border:1px solid #223044; border-radius:12px; padding:14px; }
+
     .toggles { display:flex; align-items:flex-start; gap:16px; justify-content:flex-start; }
     .toggleBlock { display:inline-grid; grid-template-rows:auto auto; gap:2px; }
     .toggleBlock .top { line-height:1; }
@@ -60,8 +63,15 @@
     .mutedInput { background:#0c1015; color:#b8c5d6; border-color:#2a3340; }
 
     .error { border-color:#d76969 !important; }
-  .labelHeader { font-weight:700; font-size:1.5rem; line-height:1.2; margin:64px 0 12px; text-align:left; }
-  .sectionBox { background:#0d1116; border:1px solid #223044; border-radius:12px; padding:14px; }
+
+    /* Dim styling for non-functional inputs */
+    label[for="g1099"], label[for="ssa1099"],
+    label[for="k401"], label[for="solo401_emp"], label[for="solo401_er"],
+    label[for="qbi"] { color:#575555 !important; }
+    
+    #g1099, #ssa1099,
+    #k401, #solo401_emp, #solo401_er,
+    #qbi { color:#575555 !important; border-color:#575555 !important; }
   </style>
 </head>
 <body>
@@ -95,211 +105,213 @@
       </div>
     </div>
 
-    <!-- W-2 Section -->
+    <!-- Income Inputs -->
     <div class="labelHeader">Income Inputs</div>
     <div class="sectionBox">
-    <div class="divider"><span>W‑2 Income</span></div>
-    <div class="row3" style="margin-top:8px">
-      <div>
-        <label for="w2">W‑2 (Employee Wages)</label>
-        <input id="w2" type="text" placeholder="e.g., $95,000" />
+      <div class="divider"><span>W‑2 Income</span></div>
+      <div class="row3" style="margin-top:8px">
+        <div>
+          <label for="w2">W‑2 (Employee Wages)</label>
+          <input id="w2" type="text" placeholder="e.g., $95,000" />
+        </div>
+        <div>
+          <label for="w2_ss2">W‑2 Social Security Wages</label>
+          <input id="w2_ss2" type="text" placeholder="$0" />
+        </div>
+        <div>
+          <label for="w2_med">W‑2 Medicare Wages</label>
+          <input id="w2_med" type="text" placeholder="$0" />
+        </div>
       </div>
-      <div>
-        <label for="w2_ss2">W‑2 Social Security Wages</label>
-        <input id="w2_ss2" type="text" placeholder="$0" />
-      </div>
-      <div>
-        <label for="w2_med">W‑2 Medicare Wages</label>
-        <input id="w2_med" type="text" placeholder="$0" />
+
+      <div class="divider"><span>1099 Income</span></div>
+      <div class="row5" style="margin-top:8px">
+        <div>
+          <label for="nec">1099‑NEC</label>
+          <input id="nec" type="text" placeholder="e.g., $18,000" />
+        </div>
+        <div>
+          <label for="int">1099‑INT</label>
+          <input id="int" type="text" placeholder="e.g., $450" />
+        </div>
+        <div>
+          <label for="div">1099‑DIV</label>
+          <input id="div" type="text" placeholder="e.g., $1,200" />
+        </div>
+        <div>
+          <label class="mutedLabel" for="g1099">1099‑G (Box 1)</label>
+          <input id="g1099" class="mutedInput" type="text" placeholder="$0" />
+        </div>
+        <div>
+          <label class="mutedLabel" for="ssa1099">SSA‑1099</label>
+          <input id="ssa1099" class="mutedInput" type="text" placeholder="$0" />
+        </div>
       </div>
     </div>
 
-    <!-- 1099 Section -->
-    <div class="divider"><span>1099 Income</span></div>
-    <div class="row5" style="margin-top:8px">
-      <div>
-        <label for="nec">1099‑NEC</label>
-        <input id="nec" type="text" placeholder="e.g., $18,000" />
-      </div>
-      <div>
-        <label for="int">1099‑INT</label>
-        <input id="int" type="text" placeholder="e.g., $450" />
-      </div>
-      <div>
-        <label for="div">1099‑DIV</label>
-        <input id="div" type="text" placeholder="e.g., $1,200" />
-      </div>
-      <div>
-        <label class="mutedLabel" for="g1099">1099‑G (Box 1)</label>
-        <input id="g1099" class="mutedInput" type="text" placeholder="$0" />
-      </div>
-      <div>
-        <label class="mutedLabel" for="ssa1099">SSA‑1099</label>
-        <input id="ssa1099" class="mutedInput" type="text" placeholder="$0" />
-      </div>
-    </div>
-
-    </div>
-    <!-- Retirement -->
+    <!-- Deduction Inputs -->
     <div class="labelHeader">Deduction Inputs</div>
     <div class="sectionBox">
-    <div class="divider"><span>Retirement</span></div>
-    <div class="row4" style="margin-top:8px">
-      <div>
-        <label for="k401">401(k)</label>
-        <div class="iraRow"><input id="k401" type="text" placeholder="$0" /></div>
-      </div>
-      <div>
-        <label for="solo401_emp">Solo 401(k) - Employee</label>
-        <div class="iraRow"><input id="solo401_emp" type="text" placeholder="$0" /></div>
-      </div>
-      <div>
-        <label for="solo401_er">Solo 401(k) - Employer</label>
-        <div class="iraRow"><input id="solo401_er" type="text" placeholder="$0" /></div>
-      </div>
-      <div>
-        <label for="iraDed">IRA</label>
-        <div class="iraRow">
-          <input id="iraDed" type="text" placeholder="$0" />
-          <span class="pill" id="iraMaxPill">Max: $7,000.00</span>
+      <div class="divider"><span>Retirement</span></div>
+      <div class="row4" style="margin-top:8px">
+        <div>
+          <label for="k401">401(k)</label>
+          <div class="iraRow"><input id="k401" type="text" placeholder="$0" /></div>
         </div>
-        <div id="iraError" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
+        <div>
+          <label for="solo401_emp">Solo 401(k) - Employee</label>
+          <div class="iraRow"><input id="solo401_emp" type="text" placeholder="$0" /></div>
+        </div>
+        <div>
+          <label for="solo401_er">Solo 401(k) - Employer</label>
+          <div class="iraRow"><input id="solo401_er" type="text" placeholder="$0" /></div>
+        </div>
+        <div>
+          <label for="iraDed">IRA</label>
+          <div class="iraRow">
+            <input id="iraDed" type="text" placeholder="$0" />
+            <span class="pill" id="iraMaxPill">Max: $7,000.00</span>
+          </div>
+          <div id="iraError" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <div class="divider"><span>Deductions</span></div>
+      <div class="threeLine alignEnd" style="margin-top:8px">
+        <div>
+          <label for="halfSe">½ SE Tax Deduction</label>
+          <input id="halfSe" type="text" readonly />
+        </div>
+        <div>
+          <label for="stdDeduction">Standard Deduction</label>
+          <input id="stdDeduction" type="text" readonly />
+        </div>
+        <div>
+          <label for="qbi">QBI Deduction</label>
+          <input id="qbi" type="text" value="$0.00" />
+        </div>
       </div>
     </div>
 
-    <!-- Deductions -->
-    <div class="divider"><span>Deductions</span></div>
-    <div class="twoCol alignEnd" style="margin-top:8px">
-      <div>
-        <label for="halfSe">½ SE Tax Deduction</label>
-        <input id="halfSe" type="text" readonly />
-      </div>
-      <div>
-        <label for="stdDeduction">Standard Deduction</label>
-        <input id="stdDeduction" type="text" readonly />
-      </div>
-    </div>
-
-    </div>
-    <!-- SE Tax calc section -->
+    <!-- Tax Calculations -->
     <div class="labelHeader">Tax Calculations</div>
     <div class="sectionBox">
-    <div class="divider"><span>Calculation of SE Tax</span></div>
-    <div class="row4" style="margin-top:8px">
-      <div>
-        <label for="expenses">SE Expenses</label>
-        <input id="expenses" type="text" placeholder="e.g., $5,000" />
+      <div class="divider"><span>Calculation of SE Tax</span></div>
+      <div class="row4" style="margin-top:8px">
+        <div>
+          <label for="expenses">SE Expenses</label>
+          <input id="expenses" type="text" placeholder="e.g., $5,000" />
+        </div>
+        <div>
+          <label for="netSe">Net SE Income</label>
+          <input id="netSe" type="text" readonly />
+        </div>
+        <div>
+          <label for="ficaDed">FICA Deduction (7.65%)</label>
+          <input id="ficaDed" type="text" readonly />
+        </div>
+        <div>
+          <label for="seTaxable">SE Taxable Income</label>
+          <input id="seTaxable" type="text" readonly />
+        </div>
       </div>
-      <div>
-        <label for="netSe">Net SE Income</label>
-        <input id="netSe" type="text" readonly />
+      <div class="threeLine" style="margin-top:8px">
+        <div>
+          <label for="ssTax">Social Security (12.4%)</label>
+          <input id="ssTax" type="text" readonly />
+          <div id="ssBaseNote" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
+        </div>
+        <div>
+          <label for="medicareTax">Medicare (2.9%)</label>
+          <input id="medicareTax" type="text" readonly />
+        </div>
+        <div>
+          <label class="dangerLabel" for="seTax">Self‑Employment Tax</label>
+          <input id="seTax" class="dangerInput" type="text" readonly />
+        </div>
       </div>
-      <div>
-        <label for="ficaDed">FICA Deduction (7.65%)</label>
-        <input id="ficaDed" type="text" readonly />
-      </div>
-      <div>
-        <label for="seTaxable">SE Taxable Income</label>
-        <input id="seTaxable" type="text" readonly />
-      </div>
-    </div>
-    <div class="threeLine" style="margin-top:8px">
-      <div>
-        <label for="ssTax">Social Security (12.4%)</label>
-        <input id="ssTax" type="text" readonly />
-        <div id="ssBaseNote" class="small" style="color:#f7a5a5; display:none; margin-top:4px;"></div>
-      </div>
-      <div>
-        <label for="medicareTax">Medicare (2.9%)</label>
-        <input id="medicareTax" type="text" readonly />
-      </div>
-      <div>
-        <label class="dangerLabel" for="seTax">Self‑Employment Tax</label>
-        <input id="seTax" class="dangerInput" type="text" readonly />
-      </div>
-    </div>
 
-    <!-- W-2 FICA Taxes -->
-    <div class="divider"><span>W‑2 FICA Taxes</span></div>
-    <div class="threeLine" style="margin-top:8px">
-      <div>
-        <label for="w2FicaSSTax">W‑2 Social Security (6.2%)</label>
-        <input id="w2FicaSSTax" type="text" readonly />
+      <div class="divider"><span>W‑2 FICA Taxes</span></div>
+      <div class="threeLine" style="margin-top:8px">
+        <div>
+          <label for="w2FicaSSTax">W‑2 Social Security (6.2%)</label>
+          <input id="w2FicaSSTax" type="text" readonly />
+        </div>
+        <div>
+          <label for="w2FicaMedTax">W‑2 Medicare (1.45%)</label>
+          <input id="w2FicaMedTax" type="text" readonly />
+        </div>
+        <div>
+          <label class="dangerLabel" for="w2FicaTotal">Total W‑2 FICA</label>
+          <input id="w2FicaTotal" class="dangerInput" type="text" readonly />
+        </div>
       </div>
-      <div>
-        <label for="w2FicaMedTax">W‑2 Medicare (1.45%)</label>
-        <input id="w2FicaMedTax" type="text" readonly />
-      </div>
-      <div>
-        <label class="dangerLabel" for="w2FicaTotal">Total W‑2 FICA</label>
-        <input id="w2FicaTotal" class="dangerInput" type="text" readonly />
-      </div>
-    </div>
 
-    <div class="divider"><span>Federal Income Tax Bracket Breakdown</span></div>
-    <div id="results"></div>
-
+      <div class="divider"><span>Federal Income Tax Bracket Breakdown</span></div>
+      <div id="results"></div>
     </div>
 
+    <!-- Tax Summary -->
     <div class="labelHeader">Tax Summary</div>
     <div class="sectionBox">
-    <div class="divider"><span>Summary of Taxes</span></div>
-    <div class="twoCol" style="margin-top:8px">
-      <div>
-        <label for="agiBox">Adjusted Gross Income (AGI)</label>
-        <input id="agiBox" type="text" readonly />
+      <div class="divider"><span>Summary of Taxes</span></div>
+      <div class="twoCol" style="margin-top:8px">
+        <div>
+          <label for="agiBox">Adjusted Gross Income (AGI)</label>
+          <input id="agiBox" type="text" readonly />
+        </div>
+        <div>
+          <label for="magiBox">Modified AGI (MAGI)</label>
+          <input id="magiBox" type="text" readonly />
+        </div>
       </div>
-      <div>
-        <label for="magiBox">Modified AGI (MAGI)</label>
-        <input id="magiBox" type="text" readonly />
-      </div>
-    </div>
-    <div class="threeLine" style="margin-top:8px">
-      <div>
-        <label class="dangerLabel" for="fedTaxOwed">Total Federal Income Tax Owed</label>
-        <input id="fedTaxOwed" class="dangerInput" type="text" readonly />
-      </div>
-      <div>
-        <label class="dangerLabel" for="seTaxOwed">Total Self‑Employment Tax Owed</label>
-        <input id="seTaxOwed" class="dangerInput" type="text" readonly />
-      </div>
-      <div>
-        <label class="dangerLabel" for="w2FicaTotalSummary">Total W‑2 FICA Taxes</label>
-        <input id="w2FicaTotalSummary" class="dangerInput" type="text" readonly />
-      </div>
-    </div>
 
-    <div class="stack" style="margin-top:8px">
-      <div>
-        <div class="kpi">
-          <span class="dangerLabel">Total Taxes Owed:</span><br>
-          <strong id="totalTaxesDisplay" class="dangerValue">$0.00</strong>
+      <div class="threeLine" style="margin-top:8px">
+        <div>
+          <label class="dangerLabel" for="fedTaxOwed">Total Federal Income Tax Owed</label>
+          <input id="fedTaxOwed" class="dangerInput" type="text" readonly />
+        </div>
+        <div>
+          <label class="dangerLabel" for="seTaxOwed">Total Self‑Employment Tax Owed</label>
+          <input id="seTaxOwed" class="dangerInput" type="text" readonly />
+        </div>
+        <div>
+          <label class="dangerLabel" for="w2FicaTotalSummary">Total W‑2 FICA Taxes</label>
+          <input id="w2FicaTotalSummary" class="dangerInput" type="text" readonly />
+        </div>
+      </div>
+
+      <div class="stack" style="margin-top:8px">
+        <div>
+          <div class="kpi">
+            <span class="dangerLabel">Total Taxes Owed:</span><br>
+            <strong id="totalTaxesDisplay" class="dangerValue">$0.00</strong>
+          </div>
         </div>
       </div>
     </div>
 
-    </div>
-
+    <!-- Visualization -->
     <div class="labelHeader">Visualization</div>
     <div class="sectionBox">
-    <div class="divider"><span>Income → Outflows Visualization</span></div>
-    <div id="sankeyWrap" style="margin:8px 0 16px">
-      <div id="sankeyChart" style="width:100%; height:420px;"></div>
-      <p class="muted small">Shows inflows (left) and outflows (right): Federal Income Tax, Self‑Employment Tax, W‑2 FICA (employee), IRA Saving, and Take‑home Cash.</p>
+      <div class="divider"><span>Income → Outflows Visualization</span></div>
+      <div id="sankeyWrap" style="margin:8px 0 16px">
+        <div id="sankeyChart" style="width:100%; height:420px;"></div>
+        <p class="muted small">Shows inflows (left) and outflows (right): Federal Income Tax, Self‑Employment Tax, W‑2 FICA (employee), IRA Saving, and Take‑home Cash.</p>
+      </div>
     </div>
 
-    </div>
-
+    <!-- Estimated Tax Calculator -->
     <div class="labelHeader">Estimated Tax Calculator</div>
     <div class="sectionBox">
-    <div class="divider"><span>Required Estimated Tax Payments</span></div>
-    <div class="row4" style="margin-top:8px">
-      <div><label for="estQ1">Quarter 1: Due Apr 15</label><input id="estQ1" type="text" placeholder="$0" /></div>
-      <div><label for="estQ2">Quarter 2: Due Jun 15</label><input id="estQ2" type="text" placeholder="$0" /></div>
-      <div><label for="estQ3">Quarter 3: Due Sep 15</label><input id="estQ3" type="text" placeholder="$0" /></div>
-      <div><label for="estQ4">Quarter 4: Due Jan 15</label><input id="estQ4" type="text" placeholder="$0" /></div>
-    </div>
-    <p class="muted small">Warning: You could be subject to IRS penalties if your total estimated tax payments add up to less than 90% of your total tax liability.</p>
+      <div class="divider"><span>Required Estimated Tax Payments</span></div>
+      <div class="row4" style="margin-top:8px">
+        <div><label for="estQ1">Quarter 1: Due Apr 15</label><input id="estQ1" type="text" placeholder="$0" /></div>
+        <div><label for="estQ2">Quarter 2: Due Jun 15</label><input id="estQ2" type="text" placeholder="$0" /></div>
+        <div><label for="estQ3">Quarter 3: Due Sep 15</label><input id="estQ3" type="text" placeholder="$0" /></div>
+        <div><label for="estQ4">Quarter 4: Due Jan 15</label><input id="estQ4" type="text" placeholder="$0" /></div>
+      </div>
+      <p class="muted small">Warning: You could be subject to IRS penalties if your total estimated tax payments add up to less than 90% of your total tax liability.</p>
     </div>
   </div>
 
@@ -498,7 +510,6 @@
       const magi = agi + iraUsed; setMoneyInput('magiBox', magi);
       setMoneyInput('fedTaxOwed', total);
       setMoneyInput('seTaxOwed', se.seTaxTotal||0);
-      let totalTaxes = 0; // will include W-2 FICA once computed
 
       // W‑2 FICA (employee) calculations & Summary binding
       const w2FicaSS = EMP_SS_RATE * Math.min(Math.max(0, w2_ss2_val), SS_WAGE_BASE_2025);
@@ -509,8 +520,8 @@
       setMoneyInput('w2FicaTotal', w2FicaTotal);
       setMoneyInput('w2FicaTotalSummary', w2FicaTotal);
 
-      // Update Total Taxes Owed to include W-2 FICA
-      totalTaxes = total + (se.seTaxTotal||0) + w2FicaTotal;
+      // Total taxes owed (filing-time + W-2 FICA, per your spec)
+      const totalTaxes = total + (se.seTaxTotal||0) + w2FicaTotal;
       document.getElementById('totalTaxesDisplay').textContent = money(totalTaxes);
 
       // Estimated payments
@@ -542,7 +553,7 @@
     }
 
     // Currency input wiring
-    const currencyIds = ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4'];
+    const currencyIds = ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','qbi','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4'];
     currencyIds.forEach(id => {
       const el = document.getElementById(id); if(!el) return;
       el.addEventListener('focus', () => { el.value = parseMoney(el.value) || ''; });
@@ -568,7 +579,7 @@
     document.getElementById('status').addEventListener('change', render);
 
     // Seed $0.00 for cleanliness
-    ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4','netSe','ficaDed','seTaxable','ssTax','medicareTax','seTax','halfSe','w2FicaSSTax','w2FicaMedTax','w2FicaTotal','w2FicaTotalSummary','fedTaxOwed','seTaxOwed','agiBox','magiBox','stdDeduction'].forEach(id => { const el = document.getElementById(id); if(el) setMoneyInput(id, 0); });
+    ['w2','w2_ss2','w2_med','nec','int','div','g1099','ssa1099','expenses','iraDed','qbi','k401','solo401_emp','solo401_er','estQ1','estQ2','estQ3','estQ4','netSe','ficaDed','seTaxable','ssTax','medicareTax','seTax','halfSe','w2FicaSSTax','w2FicaMedTax','w2FicaTotal','w2FicaTotalSummary','fedTaxOwed','seTaxOwed','agiBox','magiBox','stdDeduction'].forEach(id => { const el = document.getElementById(id); if(el) setMoneyInput(id, 0); });
 
     // Tests
     (function tests(){
