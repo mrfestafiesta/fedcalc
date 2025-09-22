@@ -67,8 +67,8 @@
     /* Dim styling for non-functional inputs */
     label[for="g1099"], label[for="ssa1099"],
     label[for="k401"], label[for="solo401_emp"], label[for="solo401_er"],
-    label[for="qbi"], label[for="seHealth"] { color:#575555 !important; }
-    #g1099, #ssa1099, #k401, #solo401_emp, #solo401_er, #qbi, #seHealth { color:#575555 !important; border-color:#575555 !important; }
+    label[for="qbi"] { color:#575555 !important; }
+    #g1099, #ssa1099, #k401, #solo401_emp, #solo401_er, #qbi { color:#575555 !important; border-color:#575555 !important; }
   </style>
 </head>
 <body>
@@ -162,6 +162,7 @@
     <div class="labelHeader">Deduction Inputs</div>
     <div class="sectionBox">
       <div class="divider"><span>Retirement</span></div>
+      <p class="muted small" style="margin-top:4px;">The IRA deduction is currently the only modeled retirement option. The deduction is capped based on your filing status &amp; age. MAGI-based IRA Deduction limits are NOT currently modeled in.</p>
       <div class="row4" style="margin-top:8px">
         <div>
           <label for="iraDed">IRA</label>
@@ -477,6 +478,9 @@
       const div  = getMoneyInput('div');
       const expenses = getMoneyInput('expenses');
 
+      // Self‑Employed Health Insurance deduction (placeholder rules)
+      const seHealthUsed = Math.max(0, getMoneyInput('seHealth')); // reduces AGI; not added back to MAGI
+
       // IRA validation + pill
       const iraInput = document.getElementById('iraDed');
       const iraErrEl = document.getElementById('iraError');
@@ -509,7 +513,7 @@
       setMoneyInput('halfSe', se.halfSe);
 
       // AGI & taxes
-      const agi = w2 + (nec - expenses) + intr + div - se.halfSe - iraUsed;
+      const agi = w2 + (nec - expenses) + intr + div - se.halfSe - iraUsed - seHealthUsed;
       const stdDed = STD_DED[status]; setMoneyInput('stdDeduction', stdDed);
       const taxable = Math.max(0, agi - stdDed);
       const { rows: brRows, total } = computeTaxByBracket(taxable, BRACKETS_2025[status]);
