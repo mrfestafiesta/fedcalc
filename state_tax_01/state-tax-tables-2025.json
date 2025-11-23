@@ -1,0 +1,103 @@
+{
+  "CA": {
+    "year": 2025,
+    "usesStandardDeduction": true,
+    "standardDeduction": {
+      "single": 5202,
+      "mfj": 10404,
+      "hoh": 5202,
+      "mfs": 5202
+    },
+    "brackets": {
+      "single": [
+        { "upTo": 10099, "rate": 0.01 },
+        { "upTo": 23942, "rate": 0.02 },
+        { "upTo": 37788, "rate": 0.04 },
+        { "upTo": 52455, "rate": 0.06 },
+        { "upTo": 66295, "rate": 0.08 },
+        { "upTo": 338639, "rate": 0.093 },
+        { "upTo": 406364, "rate": 0.103 },
+        { "upTo": 677275, "rate": 0.113 },
+        { "upTo": "Infinity", "rate": 0.123 }
+      ],
+      "mfj": [
+        { "upTo": 20198, "rate": 0.01 },
+        { "upTo": 47884, "rate": 0.02 },
+        { "upTo": 75576, "rate": 0.04 },
+        { "upTo": 104910, "rate": 0.06 },
+        { "upTo": 132590, "rate": 0.08 },
+        { "upTo": 677278, "rate": 0.093 },
+        { "upTo": 812728, "rate": 0.103 },
+        { "upTo": 1354550, "rate": 0.113 },
+        { "upTo": "Infinity", "rate": 0.123 }
+      ],
+      "hoh": [
+        { "upTo": 20212, "rate": 0.01 },
+        { "upTo": 47886, "rate": 0.02 },
+        { "upTo": 61630, "rate": 0.04 },
+        { "upTo": 75872, "rate": 0.06 },
+        { "upTo": 86934, "rate": 0.08 },
+        { "upTo": 445542, "rate": 0.093 },
+        { "upTo": 534760, "rate": 0.103 },
+        { "upTo": 890845, "rate": 0.113 },
+        { "upTo": "Infinity", "rate": 0.123 }
+      ],
+      "mfs": [
+        { "upTo": 10099, "rate": 0.01 },
+        { "upTo": 23942, "rate": 0.02 },
+        { "upTo": 37788, "rate": 0.04 },
+        { "upTo": 52455, "rate": 0.06 },
+        { "upTo": 66295, "rate": 0.08 },
+        { "upTo": 338639, "rate": 0.093 },
+        { "upTo": 406364, "rate": 0.103 },
+        { "upTo": 677275, "rate": 0.113 },
+        { "upTo": "Infinity", "rate": 0.123 }
+      ]
+    },
+    "notes": {
+      "agiBase": "federalAGI",
+      "additionalTaxes": ["1% Mental Health Services Tax on income over $1,000,000"]
+    }
+  },
+  "NV": {
+    "year": 2025,
+    "usesStandardDeduction": false,
+    "standardDeduction": {
+      "single": 0,
+      "mfj": 0,
+      "hoh": 0,
+      "mfs": 0
+    },
+    "brackets": {
+      "single": [],
+      "mfj": [],
+      "hoh": [],
+      "mfs": []
+    },
+    "notes": {
+      "agiBase": "none",
+      "flatTax": 0,
+      "comment": "Nevada has no personal state income tax."
+    }
+  },
+  "AZ": {
+    "year": 2025,
+    "usesStandardDeduction": true,
+    "standardDeduction": {
+      "single": 13850,
+      "mfj": 27700,
+      "hoh": 20800,
+      "mfs": 13850
+    },
+    "brackets": {
+      "single": [{ "upTo": "Infinity", "rate": 0.025 }],
+      "mfj": [{ "upTo": "Infinity", "rate": 0.025 }],
+      "hoh": [{ "upTo": "Infinity", "rate": 0.025 }],
+      "mfs": [{ "upTo": "Infinity", "rate": 0.025 }]
+    },
+    "notes": {
+      "agiBase": "federalAGI",
+      "comment": "Arizona imposes a flat 2.5% individual income tax rate starting in 2023."
+    }
+  }
+}
