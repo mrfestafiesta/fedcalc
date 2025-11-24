@@ -47,7 +47,7 @@
           <select id="state">
             <option value="" selected disabled>Select</option>
             <option value="CA">CA</option>
-            <option value="AZ">AZ</option>
+            <option value="WA">WA</option>
             <option value="NV">NV</option>
           </select>
         </div>
@@ -70,7 +70,23 @@
           <input id="stdDeductionState" type="text" readonly value="$0.00" />
         </div>
       </div>
+  </div>
+
+  <!-- State Tax Calculation -->
+  <div class="labelHeader">State Income Tax</div>
+  <div class="sectionBox">
+    <div class="row3">
+      <div>
+        <label for="stateTaxableBase">State Taxable Income</label>
+        <input id="stateTaxableBase" type="text" value="$0.00" />
+        <p class="muted small">Enter the income amount your state taxes (e.g., AGI minus state adjustments and the state standard deduction).</p>
+      </div>
+      <div>
+        <label for="stateTaxOwed">State Income Tax Owed</label>
+        <input id="stateTaxOwed" type="text" readonly value="$0.00" />
+      </div>
     </div>
+  </div>
   </div>
 
   <script>
@@ -95,13 +111,42 @@
 
     function setMoneyInput(id, value) {
       const el = document.getElementById(id);
-      if (el) el.value = `$${Number(value).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+      if (el) el.value = '$' + (Number(value)||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    function parseMoney(s){
+      if (s == null) return 0;
+      const cleaned = String(s).replace(/[^0-9.-]/g,'');
+      const n = parseFloat(cleaned);
+      return isNaN(n) ? 0 : n;
+    }
+    function computeTaxByBracket(taxable, brackets){
+      let remaining = Math.max(0, Number(taxable)||0);
+      let prior = 0;
+      let total = 0;
+      for (const b of (brackets||[])){
+        const capRaw = (b && b.upTo);
+        const cap = (capRaw === 'Infinity' || capRaw === Infinity) ? Infinity : Number(capRaw)||0;
+        const limit = isFinite(cap) ? cap : prior + remaining; // for Infinity, consume all remaining
+        const slice = Math.max(0, Math.min(remaining, limit - prior));
+        total += slice * (Number(b.rate)||0);
+        remaining -= slice;
+        prior = isFinite(cap) ? cap : prior + slice;
+        if (remaining <= 0) break;
+      }
+      return total;
+    }
+    function computeStateTax(stateCfg, status, taxable){
+      if (!stateCfg) return 0;
+      const br = (stateCfg.brackets && stateCfg.brackets[status]) || [];
+      if (!br.length) return 0;
+      return computeTaxByBracket(taxable, br);
     }
 
-    function render() {
+    function render(){
       const status = document.getElementById('status')?.value || 'single';
       const stateSel = (document.getElementById('state')?.value || '').trim();
 
+      // 1) State standard deduction box
       let stdState = 0;
       if (stateSel && stateTablesLoaded && STATE_TAX_TABLES[stateSel]) {
         const stateCfg = STATE_TAX_TABLES[stateSel];
@@ -109,6 +154,14 @@
         stdState = Number(stdMap[status]) || 0;
       }
       setMoneyInput('stdDeductionState', stdState);
+
+      // 2) State tax owed (user-controlled taxable base)
+      const taxableBase = parseMoney(document.getElementById('stateTaxableBase')?.value || 0);
+      let stateTax = 0;
+      if (stateSel && stateTablesLoaded && STATE_TAX_TABLES[stateSel]) {
+        stateTax = computeStateTax(STATE_TAX_TABLES[stateSel], status, Math.max(0, taxableBase));
+      }
+      setMoneyInput('stateTaxOwed', stateTax);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -118,6 +171,18 @@
         const stateEl = document.getElementById('state');
         if (statusEl) statusEl.addEventListener('change', render);
         if (stateEl) stateEl.addEventListener('change', render);
+
+        const taxBaseEl = document.getElementById('stateTaxableBase');
+        if (taxBaseEl){
+          taxBaseEl.addEventListener('focus', () => {
+            taxBaseEl.value = String(parseMoney(taxBaseEl.value) || '');
+          });
+          taxBaseEl.addEventListener('blur', () => {
+            taxBaseEl.value = '$' + (Number(parseMoney(taxBaseEl.value))||0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+            render();
+          });
+          taxBaseEl.addEventListener('input', () => { render(); });
+        }
       });
     });
   </script>
