@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Outdoor Tracker</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; }
+        
+        /* Camera Section */
+        #camera-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #111; /* Dark background when camera is off */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none; /* Hidden by default */
+        }
+
+        /* Show video when active class is added */
+        video.active { display: block; }
+
+        /* Map Section */
+        #map { flex: 1; width: 100%; }
+
+        /* Status Overlay (Top Left) */
+        #status {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* Controls Container (Bottom Left) */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000; /* Above the map */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Pill Buttons */
+        .pill-btn {
+            background-color: #444; /* Default Off color */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px; /* Pill shape */
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: background-color 0.3s;
+            text-align: center;
+            width: 140px; 
+        }
+
+        /* Active State (Green) */
+        .pill-btn.active {
+            background-color: #28a745; 
+        }
+
+        /* Press effect */
+        .pill-btn:active { transform: scale(0.98); }
+
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        <button id="btn-path" class="pill-btn">GPS Path Off</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- State Variables ---
+        let latestPosition = null; 
+        let pathCoordinates = [];
+        let isCameraOn = false;    // Default: False
+        let isPathOn = false;      // Default: False
+        let currentStream = null;  // To store camera stream so we can stop it later
+
+        // --- DOM Elements ---
+        const statusDiv = document.getElementById('status');
+        const videoElement = document.getElementById('video-feed');
+        const camPlaceholder = document.getElementById('camera-placeholder');
+        const btnCam = document.getElementById('btn-cam');
+        const btnPath = document.getElementById('btn-path');
+
+        // --- 1. Initialize Map ---
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const userMarker = L.marker([0, 0]).addTo(map);
+        const pathLine = L.polyline([], {color: 'red'}).addTo(map);
+
+        // --- 2. Camera Logic (Toggle) ---
+        btnCam.addEventListener('click', async () => {
+            if (!isCameraOn) {
+                // TURN ON
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "environment" } 
+                    });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    
+                    // Update State & UI
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                } catch (err) {
+                    console.error("Camera Error:", err);
+                    alert("Could not access camera.");
+                }
+            } else {
+                // TURN OFF
+                if (currentStream) {
+                    // Stop all tracks to release hardware/battery
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+
+                // Update State & UI
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+            }
+        });
+
+        // --- 3. GPS Logic (Always Running) ---
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    latestPosition = [lat, lng];
+                    
+                    // Always update current location marker & center map
+                    userMarker.setLatLng(latestPosition);
+                    map.setView(latestPosition); 
+                    
+                    statusDiv.innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                },
+                (error) => {
+                    console.error("GPS Error:", error);
+                    statusDiv.innerText = "GPS Error/Waiting...";
+                },
+                { enableHighAccuracy: true, maximumAge: 0 }
+            );
+        } else {
+            statusDiv.innerText = "Geolocation not supported.";
+        }
+
+        // --- 4. Breadcrumb Logic (Toggle) ---
+        btnPath.addEventListener('click', () => {
+            isPathOn = !isPathOn; // Toggle boolean
+
+            if (isPathOn) {
+                btnPath.textContent = "GPS Path On";
+                btnPath.classList.add('active');
+            } else {
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        // --- 5. The Timer (Runs always, but checks state) ---
+        setInterval(() => {
+            // Only drop a dot if we have a position AND pathing is turned ON
+            if (latestPosition && isPathOn) {
+                
+                L.circleMarker(latestPosition, {
+                    radius: 4,
+                    color: 'orange',
+                    fillColor: '#f03',
+                    fillOpacity: 0.8
+                }).addTo(map);
+
+                pathCoordinates.push(latestPosition);
+                pathLine.setLatLngs(pathCoordinates);
+            }
+        }, 5000); 
+
+    </script>
+</body>
+</html>
