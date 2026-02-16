@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Outdoor Tracker + Distance</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; }
+        
+        /* Camera Section */
+        #camera-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none; 
+        }
+        video.active { display: block; }
+
+        /* Map Section */
+        #map { flex: 1; width: 100%; }
+
+        /* Status Overlay (Top Left) */
+        #status {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* Controls Container (Bottom Left) */
+        #controls {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        /* Distance Display Group */
+        #distance-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 15px;
+            border-radius: 50px;
+            margin-bottom: 5px;
+        }
+
+        #distance-text {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        /* Small Reset Button */
+        #btn-reset {
+            background: #d9534f;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Pill Buttons */
+        .pill-btn {
+            background-color: #444; 
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 160px; 
+            transition: background-color 0.2s;
+        }
+
+        .pill-btn.active { background-color: #28a745; }
+        .pill-btn:active { transform: scale(0.98); }
+
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        
+        <div id="distance-container">
+            <span id="distance-text">0.0 ft</span>
+            <button id="btn-reset" title="Reset Trip">✕</button>
+        </div>
+
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        <button id="btn-path" class="pill-btn">GPS Path Off</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- State Variables ---
+        let latestPosition = null;      // Current GPS fix
+        let lastLoggedPosition = null;  // Last point added to the path
+        let pathCoordinates = [];       // Array of points for the line
+        let totalDistanceFeet = 0;      // Accumulated distance
+        
+        let isCameraOn = false;
+        let isPathOn = false;
+        let currentStream = null;
+
+        // --- DOM Elements ---
+        const statusDiv = document.getElementById('status');
+        const distText = document.getElementById('distance-text');
+        const videoElement = document.getElementById('video-feed');
+        const camPlaceholder = document.getElementById('camera-placeholder');
+        const btnCam = document.getElementById('btn-cam');
+        const btnPath = document.getElementById('btn-path');
+        const btnReset = document.getElementById('btn-reset');
+
+        // --- 1. Initialize Map ---
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const userMarker = L.marker([0, 0]).addTo(map);
+        const pathLine = L.polyline([], {color: 'red'}).addTo(map);
+        
+        // Layer Group for the orange dots (so we can clear them easily)
+        const dotLayer = L.layerGroup().addTo(map);
+
+        // --- 2. Camera Toggle ---
+        btnCam.addEventListener('click', async () => {
+            if (!isCameraOn) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                } catch (err) {
+                    console.error("Camera Error:", err);
+                    alert("Camera access failed.");
+                }
+            } else {
+                if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+            }
+        });
+
+        // --- 3. GPS Watcher ---
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    latestPosition = [lat, lng];
+                    
+                    userMarker.setLatLng(latestPosition);
+                    map.setView(latestPosition); 
+                    statusDiv.innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                },
+                (error) => statusDiv.innerText = "GPS Error/Waiting...",
+                { enableHighAccuracy: true, maximumAge: 0 }
+            );
+        }
+
+        // --- 4. Breadcrumb Toggle ---
+        btnPath.addEventListener('click', () => {
+            isPathOn = !isPathOn;
+            if (isPathOn) {
+                btnPath.textContent = "GPS Path On";
+                btnPath.classList.add('active');
+                // When turning ON, we reset the "last logged" to null so we don't 
+                // calculate a huge jump from where we were last time we used it.
+                lastLoggedPosition = null; 
+            } else {
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        // --- 5. Reset Button ---
+        btnReset.addEventListener('click', () => {
+            // Confirm reset (optional, but good practice)
+            if(!confirm("Reset trip distance and path?")) return;
+
+            // Reset Logic
+            totalDistanceFeet = 0;
+            distText.innerText = "0.0 ft";
+            
+            pathCoordinates = [];
+            pathLine.setLatLngs([]); // Clear Red Line
+            dotLayer.clearLayers();  // Clear Orange Dots
+            
+            lastLoggedPosition = null;
+        });
+
+        // --- 6. The Breadcrumb & Distance Timer (5s) ---
+        setInterval(() => {
+            if (latestPosition && isPathOn) {
+                
+                // A. Calculate Distance (if we have a previous point)
+                if (lastLoggedPosition) {
+                    // map.distance returns Meters.
+                    const distMeters = map.distance(lastLoggedPosition, latestPosition);
+                    
+                    // Convert Meters to Feet (1 m = 3.28084 ft)
+                    const distFeet = distMeters * 3.28084;
+                    
+                    // Simple noise filter: ignore movements less than 3 feet (GPS jitter)
+                    if (distFeet > 3) {
+                        totalDistanceFeet += distFeet;
+                        distText.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+                    }
+                }
+
+                // B. Draw Graphics
+                L.circleMarker(latestPosition, {
+                    radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8
+                }).addTo(dotLayer);
+
+                pathCoordinates.push(latestPosition);
+                pathLine.setLatLngs(pathCoordinates);
+
+                // C. Update "Last Logged" for the next loop
+                lastLoggedPosition = latestPosition;
+            }
+        }, 5000); 
+
+    </script>
+</body>
+</html>
