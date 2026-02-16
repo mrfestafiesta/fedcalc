@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Outdoor Web App Basis</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; }
+        
+        /* Camera Viewport - Top Half */
+        #camera-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #222;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures video fills the area */
+        }
+
+        /* Map Viewport - Bottom Half */
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Overlay UI */
+        #status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: sans-serif;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+
+    <div id="camera-container">
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+       
+    const statusDiv = document.getElementById('status');
+    let latestPosition = null; // Stores the most recent GPS coordinate
+    let pathCoordinates = [];  // Stores all points for the line
+    
+    // --- STEP A: Initialize Map ---
+    const map = L.map('map').setView([0, 0], 2);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // This is the "Live" marker showing where you are right now
+    const userMarker = L.marker([0, 0]).addTo(map);
+    
+    // This line connects the dots (Optional, but looks better)
+    const pathLine = L.polyline([], {color: 'red'}).addTo(map);
+
+    // --- STEP B: Access Camera (Same as before) ---
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } 
+            });
+            document.getElementById('video-feed').srcObject = stream;
+        } catch (err) {
+            console.error("Camera Error:", err);
+        }
+    }
+
+    // --- STEP C: Track GPS (The "Watcher") ---
+    function startTracking() {
+        if (!navigator.geolocation) return;
+
+        navigator.geolocation.watchPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                // 1. Update the global variable
+                latestPosition = [lat, lng];
+
+                // 2. Move the "Live" marker immediately (visual feedback)
+                userMarker.setLatLng(latestPosition);
+                
+                // 3. Center map on user
+                map.setView(latestPosition); 
+                
+                statusDiv.innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+            },
+            (error) => console.error("GPS Error:", error),
+            { enableHighAccuracy: true, maximumAge: 0 }
+        );
+    }
+
+    // --- STEP D: The 5-Second Breadcrumb Timer ---
+    setInterval(() => {
+        // Only drop a dot if we have a valid GPS fix
+        if (latestPosition) {
+            
+            // 1. Add a small orange dot (CircleMarker)
+            L.circleMarker(latestPosition, {
+                radius: 5,
+                color: 'orange',
+                fillColor: '#f03',
+                fillOpacity: 0.8
+            }).addTo(map);
+
+            // 2. Add to the path line (connect the dots)
+            pathCoordinates.push(latestPosition);
+            pathLine.setLatLngs(pathCoordinates);
+            
+            console.log("Breadcrumb dropped at:", latestPosition);
+        }
+    }, 5000); // 5000 milliseconds = 5 seconds
+
+    // Run functions
+    startCamera();
+    startTracking();
+    </script>
+</body>
+</html>
 
