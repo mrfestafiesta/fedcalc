@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Grandma's Tracker (AR + Route)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        /* --- LAYOUT --- */
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; }
+        
+        /* --- CAMERA (Top 50%) --- */
+        #camera-container {
+            flex: 1; 
+            position: relative;
+            overflow: hidden;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+        }
+        
+        video { width: 100%; height: 100%; object-fit: cover; display: none; }
+        video.active { display: block; }
+
+        /* --- AR OVERLAY --- */
+        #ar-overlay {
+            position: absolute; top: 40%; left: 50%; 
+            transform: translate(-50%, -50%);
+            display: none; pointer-events: none;
+            text-align: center; transition: left 0.1s linear; z-index: 10;
+        }
+        
+        .ar-bubble {
+            background: rgba(40, 167, 69, 0.9); color: white;
+            padding: 10px 20px; border-radius: 20px;
+            font-weight: bold; font-size: 18px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 2px solid white; white-space: nowrap;
+        }
+        
+        .ar-dist { font-size: 14px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #fff; font-weight: bold; }
+
+        /* --- DEBUGGER --- */
+        #debug-console {
+            position: absolute; top: 60px; left: 10px; 
+            background: rgba(255, 255, 0, 0.8); color: black; padding: 8px; 
+            font-size: 11px; z-index: 2000; font-family: monospace; 
+            pointer-events: none; border-radius: 4px; display: none;
+        }
+
+        /* --- MAP (Bottom 50%) --- */
+        #map { flex: 1; width: 100%; }
+
+        /* --- CONTROLS --- */
+        #controls {
+            position: absolute; bottom: 20px; left: 20px;
+            z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+        }
+
+        #data-display {
+            background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px;
+            margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px;
+        }
+        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
+        .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
+
+        /* --- BUTTONS --- */
+        .pill-btn {
+            background-color: #444; color: white; border: none; padding: 12px 20px;
+            border-radius: 50px; font-size: 14px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; width: 160px; 
+            transition: background-color 0.2s;
+        }
+        .pill-btn.active { background-color: #28a745; }
+        
+        /* Specific colors for specific buttons */
+        #btn-route { background-color: #007bff; } /* Blue for Routing */
+        #btn-reset {
+            background: #d9534f; color: white; border: none; border-radius: 4px;
+            padding: 4px 8px; font-size: 11px; cursor: pointer; margin-top: 5px; align-self: flex-end;
+        }
+
+        /* --- CHART MODAL --- */
+        #chart-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 3000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #chart-container { width: 95%; height: 50%; background: white; border-radius: 8px; padding: 10px; }
+        #close-chart { margin-top: 20px; padding: 10px 30px; background: white; border: none; font-weight: bold; border-radius: 50px; cursor: pointer; }
+        #status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+    <div id="debug-console">Waiting for GPS...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+        <div id="ar-overlay">
+            <div id="ar-text" class="ar-bubble">Target</div>
+            <div id="ar-dist" class="ar-dist">0 ft away</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        <div id="data-display">
+            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+            <button id="btn-reset">RESET TRIP</button>
+        </div>
+
+        <button id="btn-route" class="pill-btn">Show Route</button>
+
+        <button id="btn-compass" class="pill-btn">Enable Compass</button>
+        <button id="btn-graph" class="pill-btn">Show Elevation</button>
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        <button id="btn-path" class="pill-btn">GPS Path Off</button>
+    </div>
+
+    <div id="chart-modal">
+        <div id="chart-container"><canvas id="elevationChart"></canvas></div>
+        <button id="close-chart">Close Graph</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="module">
+        import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
+
+        // ==========================================
+        // --- CONFIGURATION ---
+        // ==========================================
+        
+        // Use a real coordinate near you for the route to work!
+        const AR_TARGET = { 
+            lat: 33.9863784,   // <--- HearUSA's Latitude
+            lng: -118.4398075, // <--- HearUSA's House Longitude
+            name: "HearUSA"
+        };
+
+
+        // ==========================================
+
+        // --- STATE ---
+        let latestFix = null;       
+        let lastLoggedFix = null;   
+        let deviceHeading = 0;      
+        let fullPathData = [];      
+        let totalDistanceFeet = 0;
+        let isCameraOn = false;
+        let isPathOn = false;
+        let currentStream = null;
+        let myChart = null;
+
+        // --- DOM ---
+        const statusDiv = document.getElementById('status');
+        const debugDiv = document.getElementById('debug-console');
+        const arOverlay = document.getElementById('ar-overlay');
+        const arText = document.getElementById('ar-text');
+        const arDist = document.getElementById('ar-dist');
+        const btnCompass = document.getElementById('btn-compass');
+        const btnCam = document.getElementById('btn-cam');
+        const btnPath = document.getElementById('btn-path');
+        const btnReset = document.getElementById('btn-reset');
+        const btnGraph = document.getElementById('btn-graph');
+        const btnRoute = document.getElementById('btn-route');
+        const videoElement = document.getElementById('video-feed');
+        const camPlaceholder = document.getElementById('camera-placeholder');
+        const distVal = document.getElementById('dist-val');
+        const elevVal = document.getElementById('elev-val');
+        const chartModal = document.getElementById('chart-modal');
+        const btnCloseChart = document.getElementById('close-chart');
+
+        // --- MAP SETUP ---
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        
+        const userMarker = L.marker([0, 0]).addTo(map);
+        
+        // Two types of lines:
+        const pathLine = L.polyline([], {color: 'red', weight: 4}).addTo(map); // Where you HAVE been
+        const routeLayer = L.layerGroup().addTo(map); // Where you SHOULD go (Blue)
+        const dotLayer = L.layerGroup().addTo(map); 
+
+        // Target Pin
+        const targetMarker = L.marker([AR_TARGET.lat, AR_TARGET.lng]).addTo(map).bindPopup(`<b>${AR_TARGET.name}</b><br>(Destination)`);
+
+        // --- NEW: ROUTING LOGIC (OSRM) ---
+        btnRoute.addEventListener('click', getDrivingRoute);
+
+        async function getDrivingRoute() {
+            if (!latestFix) {
+                alert("Waiting for GPS location...");
+                return;
+            }
+
+            btnRoute.innerText = "Calculating...";
+            
+            // OSRM requires "Longitude,Latitude" format (opposite of Google/Leaflet)
+            const startStr = `${latestFix.lng},${latestFix.lat}`;
+            const endStr = `${AR_TARGET.lng},${AR_TARGET.lat}`;
+
+            // Public OSRM API URL
+            const url = `https://router.project-osrm.org/route/v1/driving/${startStr};${endStr}?overview=full&geometries=geojson`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.code === 'Ok') {
+                    // Clear previous route
+                    routeLayer.clearLayers();
+
+                    // 1. Draw the Blue Line
+                    const routeCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // Flip back to Lat,Lng
+                    const routeLine = L.polyline(routeCoords, {color: 'blue', weight: 5, dashArray: '10, 10', opacity: 0.7});
+                    routeLine.addTo(routeLayer);
+
+                    // 2. Zoom to fit route
+                    map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+
+                    // 3. Show Distance Info
+                    const miles = (data.routes[0].distance * 0.000621371).toFixed(1);
+                    const minutes = (data.routes[0].duration / 60).toFixed(0);
+                    
+                    targetMarker.openPopup();
+                    targetMarker.setPopupContent(`<b>${AR_TARGET.name}</b><br>${miles} miles<br>~${minutes} min drive`);
+                    
+                    btnRoute.innerText = "Update Route";
+                } else {
+                    alert("Could not find a driving route (are you in the ocean?)");
+                    btnRoute.innerText = "Show Route";
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Routing failed. Check internet.");
+                btnRoute.innerText = "Show Route";
+            }
+        }
+
+
+        // --- COMPASS & AR ---
+        btnCompass.addEventListener('click', () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(r => {
+                    if (r === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+                    } else alert("Denied");
+                });
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+            }
+        });
+
+        function handleOrientation(e) {
+            let heading = 0;
+            if (e.webkitCompassHeading) heading = e.webkitCompassHeading;
+            else if (e.alpha !== null) heading = 360 - e.alpha; 
+            deviceHeading = heading;
+            updateAR(); 
+        }
+
+        function updateAR() {
+            if (!latestFix || !isCameraOn) return;
+
+            const userLoc = L.latLng(latestFix.lat, latestFix.lng);
+            const poiLoc = L.latLng(AR_TARGET.lat, AR_TARGET.lng);
+            const distFeet = userLoc.distanceTo(poiLoc) * 3.28084;
+
+            const y = Math.sin(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180);
+            const x = Math.cos(userLoc.lat * Math.PI/180) * Math.sin(poiLoc.lat * Math.PI/180) -
+                    Math.sin(userLoc.lat * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180) * Math.cos(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180);
+            
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            bearing = (bearing + 360) % 360; 
+
+            let diff = bearing - deviceHeading;
+            while (diff < -180) diff += 360;
+            while (diff > 180) diff -= 360;
+
+            debugDiv.innerHTML = `DEBUG: Tgt ${AR_TARGET.name}<br>Dist ${distFeet.toFixed(0)}ft<br>Hdg ${deviceHeading.toFixed(0)}°<br>Brng ${bearing.toFixed(0)}°`;
+
+            // AR Visibility Logic
+            if (distFeet < 3000) { // Visible within ~0.5 miles
+                arOverlay.style.display = 'block';
+                arText.innerText = AR_TARGET.name;
+                arDist.innerText = distFeet.toFixed(0) + " ft";
+                
+                let screenPercent = 50 + (diff * 1.5);
+                if (screenPercent < 5) screenPercent = 5;
+                if (screenPercent > 95) screenPercent = 95;
+                arOverlay.style.left = screenPercent + "%";
+                arOverlay.style.opacity = Math.abs(diff) > 45 ? "0.5" : "1.0";
+            } else {
+                arOverlay.style.display = 'none';
+            }
+        }
+
+        // --- STANDARD LOGIC ---
+        async function loadSavedTrip() {
+            try {
+                const savedPath = await get('my-hike-data');
+                if (savedPath && savedPath.length > 0) {
+                    fullPathData = savedPath;
+                    const latLngs = fullPathData.map(p => [p[0], p[1]]);
+                    pathLine.setLatLngs(latLngs);
+                    latLngs.forEach(pt => L.circleMarker(pt, {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer));
+                    
+                    // Calc Distance
+                    let restoredDist = 0;
+                    for(let i=1; i<latLngs.length; i++) restoredDist += map.distance(latLngs[i-1], latLngs[i]);
+                    totalDistanceFeet = restoredDist * 3.28084;
+                    distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+
+                    const lastPoint = fullPathData[fullPathData.length - 1];
+                    lastLoggedFix = { lat: lastPoint[0], lng: lastPoint[1] };
+                    map.setView([lastPoint[0], lastPoint[1]], 16);
+                }
+            } catch (err) { console.error(err); }
+        }
+        loadSavedTrip();
+
+        btnCam.addEventListener('click', async () => {
+            if (!isCameraOn) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                } catch (err) { alert("Camera failed."); }
+            } else {
+                if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+                arOverlay.style.display = 'none'; 
+            }
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    latestFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    userMarker.setLatLng([latestFix.lat, latestFix.lng]);
+                    const altFeet = (latestFix.alt * 3.28084).toFixed(0);
+                    statusDiv.innerText = `GPS Active\nAcc: ${latestFix.acc.toFixed(0)}m`;
+                    elevVal.innerText = `${altFeet} ft`;
+                    updateAR(); 
+                },
+                (err) => statusDiv.innerText = "Waiting for GPS...",
+                { enableHighAccuracy: true, maximumAge: 0 }
+            );
+        }
+
+        btnPath.addEventListener('click', () => {
+            isPathOn = !isPathOn;
+            if (isPathOn) {
+                btnPath.textContent = "Recording...";
+                btnPath.classList.add('active');
+                if (!lastLoggedFix && latestFix) lastLoggedFix = latestFix;
+            } else {
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        btnReset.addEventListener('click', async () => {
+            if(!confirm("Reset trip?")) return;
+            fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); dotLayer.clearLayers();
+            distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+            routeLayer.clearLayers(); // Also clear the blue route
+            await del('my-hike-data');
+        });
+
+        btnGraph.addEventListener('click', () => {
+             if (fullPathData.length < 2) { alert("Not enough data."); return; }
+             const labels = [], dataPoints = [];
+             let accumDist = 0;
+             for (let i = 0; i < fullPathData.length; i++) {
+                const point = fullPathData[i];
+                if (i > 0) {
+                    const prev = fullPathData[i-1];
+                    accumDist += (map.distance([prev[0], prev[1]], [point[0], point[1]]) * 3.28084);
+                }
+                labels.push(accumDist.toFixed(0));
+                dataPoints.push((point[2] * 3.28084)); 
+             }
+             const ctx = document.getElementById('elevationChart').getContext('2d');
+             if (myChart) myChart.destroy();
+             myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Elevation (ft)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Distance (ft)' } }, y: { title: { display: true, text: 'Altitude (ft)' } } } }
+             });
+             chartModal.style.display = 'flex';
+        });
+
+        btnCloseChart.addEventListener('click', () => { chartModal.style.display = 'none'; });
+
+        setInterval(async () => {
+            if (latestFix && isPathOn) {
+                if (lastLoggedFix) {
+                    const from = L.latLng(lastLoggedFix.lat, lastLoggedFix.lng);
+                    const to = L.latLng(latestFix.lat, latestFix.lng);
+                    const distFeet = from.distanceTo(to) * 3.28084;
+                    if (distFeet > 3) {
+                        totalDistanceFeet += distFeet;
+                        distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+                    }
+                }
+                fullPathData.push([latestFix.lat, latestFix.lng, latestFix.alt, Date.now()]);
+                await set('my-hike-data', fullPathData);
+                L.circleMarker([latestFix.lat, latestFix.lng], {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer);
+                pathLine.setLatLngs(fullPathData.map(p => [p[0], p[1]]));
+                lastLoggedFix = latestFix;
+            }
+        }, 5000);
+
+    </script>
+</body>
+</html>
