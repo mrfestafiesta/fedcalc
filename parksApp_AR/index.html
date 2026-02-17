@@ -24,20 +24,19 @@
         video.active { display: block; }
         #map { flex: 1; width: 100%; }
 
-        /* AR OVERLAY (The floating text) */
+        /* AR OVERLAY */
         #ar-overlay {
             position: absolute;
             top: 40%; 
             left: 50%;
-            transform: translate(-50%, -50%); /* Centers the div */
-            display: none; /* Hidden unless facing the target */
+            transform: translate(-50%, -50%);
+            display: none; 
             pointer-events: none;
             text-align: center;
         }
         
-        /* The Bubble styling */
         .ar-bubble {
-            background: rgba(40, 167, 69, 0.9); /* Green background */
+            background: rgba(40, 167, 69, 0.9);
             color: white;
             padding: 10px 20px;
             border-radius: 20px;
@@ -48,7 +47,6 @@
             white-space: nowrap;
         }
         
-        /* Distance text below bubble */
         .ar-dist { font-size: 12px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #eee;}
 
         /* UI CONTROLS */
@@ -108,7 +106,6 @@
         </div>
 
         <button id="btn-compass" class="pill-btn">Enable Compass</button>
-        
         <button id="btn-cam" class="pill-btn">Camera Off</button>
         <button id="btn-path" class="pill-btn">GPS Path Off</button>
     </div>
@@ -120,8 +117,9 @@
         import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
 
         // --- 1. CONFIGURATION ---
-        // Add your target here!
-        const POI_LOCATION = { 
+        
+        // A. The AR Target (The one the camera looks for)
+        const AR_TARGET = { 
             lat: 34.0522,   // <--- CHANGE THIS
             lng: -118.2437, // <--- CHANGE THIS
             name: "My House"
@@ -129,7 +127,7 @@
 
         // --- STATE ---
         let latestFix = null;       
-        let deviceHeading = 0; // Where the phone is pointing (0-360)
+        let deviceHeading = 0; 
         let isCameraOn = false;
         let isPathOn = false;
         let currentStream = null;
@@ -141,9 +139,7 @@
         const arOverlay = document.getElementById('ar-overlay');
         const arText = document.getElementById('ar-text');
         const arDist = document.getElementById('ar-dist');
-        const compassStatus = document.getElementById('compass-status');
         const btnCompass = document.getElementById('btn-compass');
-        // ... (standard buttons)
         const btnCam = document.getElementById('btn-cam');
         const btnPath = document.getElementById('btn-path');
         const btnReset = document.getElementById('btn-reset');
@@ -158,38 +154,43 @@
         const userMarker = L.marker([0, 0]).addTo(map);
         const pathLine = L.polyline([], {color: 'red'}).addTo(map);
         
-        // Add POI Marker to Map
-        L.marker([POI_LOCATION.lat, POI_LOCATION.lng]).addTo(map).bindPopup(POI_LOCATION.name);
+        
+        // --- SECTION 1.5: MAP MARKERS ---
+
+        // 1. Automatically add a pin for the AR Target
+        L.marker([AR_TARGET.lat, AR_TARGET.lng])
+            .addTo(map)
+            .bindPopup(`<b>${AR_TARGET.name}</b><br>(AR Target)`);
+
+        // 2. Add your other Hardcoded POIs here
+        L.marker([34.0540, -118.2450]) // <--- Example Park
+            .addTo(map)
+            .bindPopup("<b>The Big Oak Tree</b><br>Good lunch spot.");
+
+        // Add more markers below if you want!
+        // L.marker([lat, lng]).addTo(map).bindPopup("Name");
 
 
-        // --- 2. COMPASS LOGIC (The Hard Part) ---
+        // --- 2. COMPASS LOGIC ---
         btnCompass.addEventListener('click', () => {
-            // iOS 13+ Requirement: Request Permission
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission()
                     .then(response => {
                         if (response === 'granted') {
                             window.addEventListener('deviceorientation', handleOrientation);
-                            btnCompass.style.display = 'none'; // Hide button on success
-                        } else {
-                            alert("Permission denied");
-                        }
+                            btnCompass.style.display = 'none';
+                        } else { alert("Permission denied"); }
                     })
                     .catch(console.error);
             } else {
-                // Non-iOS devices (Android) usually just work
                 window.addEventListener('deviceorientation', handleOrientation);
                 btnCompass.style.display = 'none';
             }
         });
 
         function handleOrientation(event) {
-            // "alpha" is the compass direction (0-360)
-            // Note: Android vs iOS differences can be tricky. This is a basic implementation.
             let heading = event.webkitCompassHeading || Math.abs(event.alpha - 360);
             deviceHeading = heading;
-            
-            // Run AR loop immediately when we move
             updateAR(); 
         }
 
@@ -197,54 +198,33 @@
         function updateAR() {
             if (!latestFix || !isCameraOn) return;
 
-            // A. Calculate Distance to POI
             const userLoc = L.latLng(latestFix.lat, latestFix.lng);
-            const poiLoc = L.latLng(POI_LOCATION.lat, POI_LOCATION.lng);
+            const poiLoc = L.latLng(AR_TARGET.lat, AR_TARGET.lng);
             const distMeters = userLoc.distanceTo(poiLoc);
             const distFeet = distMeters * 3.28084;
 
-            // B. Calculate Bearing (Angle to POI)
-            // Standard formula to get angle between two coords
             const y = Math.sin(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180);
             const x = Math.cos(userLoc.lat * Math.PI/180) * Math.sin(poiLoc.lat * Math.PI/180) -
                     Math.sin(userLoc.lat * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180) * Math.cos(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180);
             let bearing = Math.atan2(y, x) * 180 / Math.PI;
-            bearing = (bearing + 360) % 360; // Normalize to 0-360
+            bearing = (bearing + 360) % 360; 
 
-            // C. Compare Bearing vs Heading
             let diff = bearing - deviceHeading;
-            
-            // Normalize difference to -180 to +180 (shortest path)
             while (diff < -180) diff += 360;
             while (diff > 180) diff -= 360;
 
-            // D. Display Logic
-            // Only show if:
-            // 1. We are close enough (< 300 ft) to care
-            // 2. The object is roughly in front of us (+/- 30 degrees FOV)
             if (distFeet < 300 && Math.abs(diff) < 35) {
                 arOverlay.style.display = 'block';
-                arText.innerText = POI_LOCATION.name;
+                arText.innerText = AR_TARGET.name;
                 arDist.innerText = distFeet.toFixed(0) + " ft";
-                
-                // E. Screen Positioning
-                // Map the -30/+30 degree difference to screen percentages
-                // Center (0 deg) = 50% left
-                // -30 deg = 10% left
-                // +30 deg = 90% left
-                // Multiplier 1.3 expands the range slightly for smoother edge exit
                 const screenPercent = 50 + (diff * 1.5); 
                 arOverlay.style.left = screenPercent + "%";
-                
             } else {
                 arOverlay.style.display = 'none';
             }
         }
 
-
-        // --- STANDARD APP LOGIC (Same as before) ---
-        
-        // Camera
+        // --- STANDARD APP LOGIC ---
         btnCam.addEventListener('click', async () => {
             if (!isCameraOn) {
                 try {
@@ -264,29 +244,24 @@
                 isCameraOn = false;
                 btnCam.textContent = "Camera Off";
                 btnCam.classList.remove('active');
-                arOverlay.style.display = 'none'; // Hide AR when cam off
+                arOverlay.style.display = 'none'; 
             }
         });
 
-        // GPS Watcher
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (pos) => {
                     latestFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
                     userMarker.setLatLng([latestFix.lat, latestFix.lng]);
-                    // map.setView([latestFix.lat, latestFix.lng]); // Optional auto-center
-                    
                     const altFeet = (latestFix.alt * 3.28084).toFixed(0);
                     elevVal.innerText = `${altFeet} ft`;
-                    
-                    updateAR(); // Update AR position on GPS move too
+                    updateAR(); 
                 },
                 (err) => console.log(err),
                 { enableHighAccuracy: true, maximumAge: 0 }
             );
         }
 
-        // Recording Logic
         btnPath.addEventListener('click', () => {
             isPathOn = !isPathOn;
             if (isPathOn) {
@@ -299,7 +274,6 @@
             }
         });
 
-        // Reset
         btnReset.addEventListener('click', async () => {
             if(!confirm("Reset?")) return;
             fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); 
@@ -307,7 +281,6 @@
             await del('my-hike-data');
         });
 
-        // Timer
         setInterval(async () => {
             if (latestFix && isPathOn) {
                 if (lastLoggedFix) {
