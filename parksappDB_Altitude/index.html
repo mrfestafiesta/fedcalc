@@ -8,11 +8,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        /* LAYOUT STRATEGY: Flexbox
+           We use a "column" flex layout so the camera (top) and map (bottom) 
+           automatically split the screen height 50/50 without us guessing pixel heights.
+        */
         body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; }
         
-        /* Camera Section */
+        /* CAMERA CONTAINER */
         #camera-container {
-            flex: 1;
+            flex: 1; /* Takes up remaining space (roughly 50%) */
             position: relative;
             overflow: hidden;
             background: #111;
@@ -22,6 +26,10 @@
             color: #555;
         }
         
+        /* VIDEO ELEMENT 
+           object-fit: cover; -> Ensures the video fills the box without stretching/distorting, 
+           even if the phone aspect ratio doesn't match the camera.
+        */
         video {
             width: 100%;
             height: 100%;
@@ -30,10 +38,13 @@
         }
         video.active { display: block; }
 
-        /* Map Section */
+        /* MAP CONTAINER */
         #map { flex: 1; width: 100%; }
 
-        /* Status Overlay (Top Left) */
+        /* UI OVERLAYS 
+           We use absolute positioning with z-index: 1000 to ensure buttons 
+           float *above* the map and camera layers.
+        */
         #status {
             position: absolute;
             top: 10px; left: 10px;
@@ -43,11 +54,10 @@
             border-radius: 4px;
             font-size: 12px;
             z-index: 1000;
-            pointer-events: none;
-            white-space: pre-line; /* Allows line breaks */
+            pointer-events: none; /* Allows clicks to pass through to the map/camera below */
+            white-space: pre-line;
         }
 
-        /* Controls Container */
         #controls {
             position: absolute;
             bottom: 20px; left: 20px;
@@ -58,7 +68,7 @@
             align-items: flex-start;
         }
 
-        /* Data Display Group */
+        /* DATA DISPLAY STYLES */
         #data-display {
             background: rgba(0, 0, 0, 0.7);
             padding: 8px 15px;
@@ -79,9 +89,8 @@
         }
         .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
 
-        /* Small Reset Button */
         #btn-reset {
-            background: #d9534f;
+            background: #d9534f; /* Red warning color */
             color: white;
             border: none;
             border-radius: 4px;
@@ -92,7 +101,7 @@
             align-self: flex-end;
         }
 
-        /* Pill Buttons */
+        /* BUTTON STYLES */
         .pill-btn {
             background-color: #444; 
             color: white;
@@ -108,8 +117,8 @@
             transition: background-color 0.2s;
         }
 
-        .pill-btn.active { background-color: #28a745; }
-        .pill-btn:active { transform: scale(0.98); }
+        .pill-btn.active { background-color: #28a745; } /* Green for ON state */
+        .pill-btn:active { transform: scale(0.98); } /* Click feedback */
 
     </style>
 </head>
@@ -144,23 +153,27 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script type="module">
-        // Import idb-keyval from UNPKG (No install needed)
+        // --- DEPENDENCIES ---
+        // idb-keyval: A tiny wrapper around IndexedDB (browser database) 
+        // that makes saving/loading data as easy as a variable.
         import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
 
-        // --- State ---
-        let latestFix = null;       // { lat, lng, alt, accuracy }
-        let lastLoggedFix = null;   // For distance calc
+        // --- GLOBAL STATE ---
+        // We store state here because the UI needs to access it across different functions.
+        let latestFix = null;       // The most recent GPS data received { lat, lng, alt, accuracy }
+        let lastLoggedFix = null;   // The last point used for distance calculation
         
-        // This is the 3D data array we save to DB
+        // The master record of the user's path.
         // Format: Array of [lat, lng, alt, timestamp]
+        // We chose array format over objects {lat:..., lng:...} to save DB space.
         let fullPathData = [];      
         
         let totalDistanceFeet = 0;
         let isCameraOn = false;
         let isPathOn = false;
-        let currentStream = null;
+        let currentStream = null;   // Stores the camera media stream object
 
-        // --- DOM Elements ---
+        // --- DOM ELEMENTS ---
         const statusDiv = document.getElementById('status');
         const distVal = document.getElementById('dist-val');
         const elevVal = document.getElementById('elev-val');
@@ -170,41 +183,43 @@
         const btnPath = document.getElementById('btn-path');
         const btnReset = document.getElementById('btn-reset');
 
-        // --- 1. Map Setup ---
+        // --- SECTION 1: MAP INITIALIZATION ---
         const map = L.map('map').setView([0, 0], 2);
+        
+        // OpenStreetMap Tile Layer (Free, no API key required)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        const userMarker = L.marker([0, 0]).addTo(map);
-        const pathLine = L.polyline([], {color: 'red'}).addTo(map);
-        const dotLayer = L.layerGroup().addTo(map);
+        // Map Objects
+        const userMarker = L.marker([0, 0]).addTo(map);          // Current location pin
+        const pathLine = L.polyline([], {color: 'red'}).addTo(map); // The red path line
+        const dotLayer = L.layerGroup().addTo(map);              // Container for orange dots
 
-        // --- 2. Database Loading (Persistence) ---
+        // --- SECTION 2: DATABASE PERSISTENCE ---
+        // This function runs on startup to check for previous hikes.
         async function loadSavedTrip() {
             try {
-                // Get data from IndexedDB
                 const savedPath = await get('my-hike-data');
                 
                 if (savedPath && savedPath.length > 0) {
                     console.log(`Loaded ${savedPath.length} points from DB.`);
                     fullPathData = savedPath;
 
-                    // Reconstruct Map Visuals
-                    // We map the 4D data back to 2D [lat, lng] for Leaflet
+                    // Reconstruct Map Visuals from loaded data
                     const latLngs = fullPathData.map(p => [p[0], p[1]]);
                     
                     // Draw Line
                     pathLine.setLatLngs(latLngs);
                     
-                    // Draw Dots (Optional: only draw last 50 to save performance if huge)
+                    // Draw Dots
                     latLngs.forEach(pt => {
                          L.circleMarker(pt, {
                             radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8
                         }).addTo(dotLayer);
                     });
 
-                    // Recalculate Distance (Rough approximation from saved data)
+                    // Recalculate Distance (Approximate)
                     let restoredDist = 0;
                     for(let i=1; i<latLngs.length; i++) {
                         restoredDist += map.distance(latLngs[i-1], latLngs[i]);
@@ -212,11 +227,11 @@
                     totalDistanceFeet = restoredDist * 3.28084;
                     distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
                     
-                    // Set last logged position to the end of the recovered path
+                    // Restore state to continue from last point
                     const lastPoint = fullPathData[fullPathData.length - 1];
                     lastLoggedFix = { lat: lastPoint[0], lng: lastPoint[1] };
                     
-                    // Center map on last point
+                    // Center map on end of path
                     map.setView([lastPoint[0], lastPoint[1]], 16);
                 }
             } catch (err) {
@@ -224,13 +239,14 @@
             }
         }
         
-        // Call load immediately
+        // Execute immediately
         loadSavedTrip();
 
-        // --- 3. Camera Logic ---
+        // --- SECTION 3: CAMERA CONTROLS ---
         btnCam.addEventListener('click', async () => {
             if (!isCameraOn) {
                 try {
+                    // facingMode: "environment" prefers the rear camera on phones
                     currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                     videoElement.srcObject = currentStream;
                     videoElement.classList.add('active');
@@ -242,6 +258,7 @@
                     alert("Camera failed.");
                 }
             } else {
+                // IMPORTANT: Stop the tracks to release the hardware and save battery
                 if (currentStream) currentStream.getTracks().forEach(t => t.stop());
                 videoElement.srcObject = null;
                 videoElement.classList.remove('active');
@@ -252,24 +269,23 @@
             }
         });
 
-        // --- 4. GPS Watcher (The Sensor) ---
+        // --- SECTION 4: GPS SENSOR (WATCHER) ---
+        // This runs passively in the background as long as the page is open.
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
+                    // Extract coordinates
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    // Altitude might be null on some devices, default to 0
-                    const alt = position.coords.altitude || 0; 
-                    const acc = position.coords.accuracy;
+                    const alt = position.coords.altitude || 0; // Fallback to 0 if null
+                    const acc = position.coords.accuracy;      // Accuracy in meters
 
-                    // Update Global State
+                    // Update Global State (so the timer can see it)
                     latestFix = { lat, lng, alt, acc };
 
-                    // Visual Updates
+                    // Update Map View
                     userMarker.setLatLng([lat, lng]);
-                    
-                    // Only center map if we aren't panning manually (optional refinement)
-                    map.setView([lat, lng]); 
+                    map.setView([lat, lng]); // Keeps user centered
 
                     // Update UI Text
                     const altFeet = (alt * 3.28084).toFixed(0);
@@ -277,17 +293,23 @@
                     elevVal.innerText = `${altFeet} ft`;
                 },
                 (err) => statusDiv.innerText = "Waiting for GPS...",
+                // Options:
+                // enableHighAccuracy: Forces GPS chip instead of just Wi-Fi triangulation
+                // maximumAge: 0 means "don't give me cached old positions, give me fresh ones"
                 { enableHighAccuracy: true, maximumAge: 0 }
             );
         }
 
-        // --- 5. Breadcrumb Toggle ---
+        // --- SECTION 5: RECORDING TOGGLE ---
         btnPath.addEventListener('click', () => {
             isPathOn = !isPathOn;
             if (isPathOn) {
                 btnPath.textContent = "Recording...";
                 btnPath.classList.add('active');
-                // If this is a fresh start (no previous data), ensure we don't jump
+                
+                // Prevent "Teleporting" glitch:
+                // If we paused and walked 100ft, we don't want to draw a line 
+                // from the old spot to the new spot. Reset the last fix.
                 if (!lastLoggedFix && latestFix) lastLoggedFix = latestFix;
             } else {
                 btnPath.textContent = "GPS Path Off";
@@ -295,11 +317,11 @@
             }
         });
 
-        // --- 6. Reset (Clear DB) ---
+        // --- SECTION 6: RESET FUNCTION ---
         btnReset.addEventListener('click', async () => {
             if(!confirm("Delete all saved path data? This cannot be undone.")) return;
 
-            // Clear RAM
+            // 1. Clear RAM variables
             fullPathData = [];
             totalDistanceFeet = 0;
             pathLine.setLatLngs([]);
@@ -307,31 +329,34 @@
             distVal.innerText = "0.0 ft";
             lastLoggedFix = null;
 
-            // Clear DB
+            // 2. Clear IndexedDB
             await del('my-hike-data');
             alert("Trip reset.");
         });
 
-        // --- 7. The Logger Loop (5s) ---
+        // --- SECTION 7: THE RECORDER LOOP ---
+        // We use a timer (setInterval) rather than recording every GPS update.
+        // GPS updates can happen 10x a second, which is too much data.
+        // 5 seconds is a good balance for hiking (resolution vs battery).
         setInterval(async () => {
             if (latestFix && isPathOn) {
                 
-                // A. Calculate Distance
+                // A. Calculate Distance (Haversine via Leaflet)
                 if (lastLoggedFix) {
                     const from = L.latLng(lastLoggedFix.lat, lastLoggedFix.lng);
                     const to = L.latLng(latestFix.lat, latestFix.lng);
                     const distMeters = from.distanceTo(to);
                     const distFeet = distMeters * 3.28084;
 
-                    // Noise Filter (3ft)
+                    // Noise Filter:
+                    // If movement is < 3ft, it's likely just GPS jitter. Ignore it.
                     if (distFeet > 3) {
                         totalDistanceFeet += distFeet;
                         distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
                     }
                 }
 
-                // B. Create 3D Point [lat, lng, alt, time]
-                // We use 3 decimal places for alt to save space, it's not that accurate anyway
+                // B. Create Data Point
                 const newPoint = [
                     latestFix.lat, 
                     latestFix.lng, 
@@ -339,23 +364,20 @@
                     Date.now()
                 ];
 
-                // C. Add to Local State
+                // C. Add to Array & DB
                 fullPathData.push(newPoint);
-                
-                // D. Update Visuals (Map needs [lat, lng])
+                await set('my-hike-data', fullPathData); // Save to disk
+
+                // D. Update Visuals
                 L.circleMarker([latestFix.lat, latestFix.lng], {
                     radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8
                 }).addTo(dotLayer);
                 
-                // Extract just lat/lng for the polyline
+                // Polyline needs strict [lat, lng] format
                 const simplePath = fullPathData.map(p => [p[0], p[1]]);
                 pathLine.setLatLngs(simplePath);
 
-                // E. SAVE TO INDEXEDDB (Persistence)
-                // We overwrite the key 'my-hike-data' with the new full array
-                await set('my-hike-data', fullPathData);
-
-                // F. Update Reference
+                // E. Update "Previous Position" for next loop
                 lastLoggedFix = latestFix;
             }
         }, 5000); 
