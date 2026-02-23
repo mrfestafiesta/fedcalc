@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Dynamic Tracker: Decoupled AR & Routing</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; }
+        
+        #camera-container { flex: 1; position: relative; overflow: hidden; background: #111; display: flex; align-items: center; justify-content: center; color: #555; }
+        video { width: 100%; height: 100%; object-fit: cover; display: none; }
+        video.active { display: block; }
+
+        #ar-overlay { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; text-align: center; transition: left 0.1s linear; z-index: 10; }
+        .ar-bubble { background: rgba(40, 167, 69, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid white; white-space: nowrap; }
+        .ar-dist { font-size: 14px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #fff; font-weight: bold; }
+
+        #debug-console { position: absolute; top: 60px; left: 10px; background: rgba(255, 255, 0, 0.8); color: black; padding: 8px; font-size: 11px; z-index: 2000; font-family: monospace; pointer-events: none; border-radius: 4px; display: none; }
+
+        #map { flex: 1; width: 100%; }
+
+        #controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+        #data-display { background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
+        .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
+
+        .pill-btn { background-color: #444; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; width: 160px; transition: background-color 0.2s; }
+        .pill-btn.active { background-color: #28a745; }
+        #btn-route { background-color: #007bff; } 
+        #btn-reset { background: #d9534f; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-top: 5px; align-self: flex-end; }
+
+        .btn-row { display: flex; gap: 10px; }
+        .small-pill { width: auto; padding: 12px 15px; }
+
+        #park-selector { padding: 10px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 160px; background: white; border: 2px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); outline: none; }
+
+        /* Popup AR Button Styling */
+        .popup-ar-btn { background-color: #444; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-weight: bold; margin-top: 8px; width: 100%; transition: 0.2s; }
+        .popup-ar-btn.active { background-color: #28a745; }
+
+        #chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #chart-container { width: 95%; height: 50%; background: white; border-radius: 8px; padding: 10px; }
+        #close-chart { margin-top: 20px; padding: 10px 30px; background: white; border: none; font-weight: bold; border-radius: 50px; cursor: pointer; }
+        #status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing...</div>
+    <div id="debug-console">Waiting for GPS...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+        <div id="ar-overlay">
+            <div id="ar-text" class="ar-bubble">Target</div>
+            <div id="ar-dist" class="ar-dist">0 ft away</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+ <div id="controls">
+        <div id="data-display">
+            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+            <button id="btn-reset">RESET TRIP</button>
+        </div>
+
+        <select id="park-selector">
+            <option value="">-- Choose Park --</option>
+            <option value="yosemite">Yosemite</option>
+        </select>
+
+        <div class="btn-row">
+            <button id="btn-route" class="pill-btn">Show Route</button>
+            <button id="btn-wake" class="pill-btn small-pill" title="Keep Screen On">🔒</button>
+        </div>
+
+        <button id="btn-compass" class="pill-btn">Enable Compass</button>
+        <button id="btn-graph" class="pill-btn">Show Elevation</button>
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        
+        <div class="btn-row">
+            <button id="btn-path" class="pill-btn">GPS Path Off</button>
+            <button id="btn-center" class="pill-btn small-pill" title="Center Map">📍</button>
+        </div>
+    </div>
+    </div>
+
+    <div id="chart-modal">
+        <div id="chart-container"><canvas id="elevationChart"></canvas></div>
+        <button id="close-chart">Close Graph</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="module">
+        import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
+
+        // --- STATE ---
+        let latestFix = null;       
+        let lastLoggedFix = null;   
+        let deviceHeading = 0;      
+        let fullPathData = [];      
+        let totalDistanceFeet = 0;
+        let isCameraOn = false;
+        let isPathOn = false;
+        let currentStream = null;
+        let myChart = null;
+        let wakeLockSentinel = null;
+        let isWakeLockRequested = false;
+        
+        // Decoupled Targets
+        window.SELECTED_POI = null; // Map selection for Routing
+        window.AR_TARGET = null;    // Specific target for Camera AR
+
+        // --- DOM ---
+        const statusDiv = document.getElementById('status');
+        const debugDiv = document.getElementById('debug-console');
+        const arOverlay = document.getElementById('ar-overlay');
+        const arText = document.getElementById('ar-text');
+        const arDist = document.getElementById('ar-dist');
+        const btnWake = document.getElementById('btn-wake');
+        const btnCompass = document.getElementById('btn-compass');
+        const btnCam = document.getElementById('btn-cam');
+        const btnPath = document.getElementById('btn-path');
+        const btnCenter = document.getElementById('btn-center');
+        const btnReset = document.getElementById('btn-reset');
+        const btnGraph = document.getElementById('btn-graph');
+        const btnRoute = document.getElementById('btn-route');
+        const parkSelector = document.getElementById('park-selector');
+        const videoElement = document.getElementById('video-feed');
+        const camPlaceholder = document.getElementById('camera-placeholder');
+        const distVal = document.getElementById('dist-val');
+        const elevVal = document.getElementById('elev-val');
+        const chartModal = document.getElementById('chart-modal');
+        const btnCloseChart = document.getElementById('close-chart');
+
+        // --- MAP SETUP ---
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        
+        const userMarker = L.marker([0, 0]).addTo(map);
+        const pathLine = L.polyline([], {color: 'red', weight: 4}).addTo(map); 
+        const routeLayer = L.layerGroup().addTo(map); 
+        const dotLayer = L.layerGroup().addTo(map); 
+        const dynamicPoiLayer = L.layerGroup().addTo(map);
+
+        // ==========================================
+        // --- GLOBAL AR TOGGLE FUNCTION ---
+        // Needs to be on the window object so the HTML button inside the Leaflet popup can trigger it.
+        // ==========================================
+        window.toggleAR = function(name, lat, lng) {
+            const btn = document.getElementById('popup-ar-btn');
+            
+            // If clicking the button of the ALREADY active target, turn it off.
+            if (window.AR_TARGET && window.AR_TARGET.name === name) {
+                window.AR_TARGET = null;
+                if(btn) btn.classList.remove('active');
+                console.log(`AR Tracking disabled for ${name}`);
+            } else {
+                // Otherwise, turn it on and lock onto this target.
+                window.AR_TARGET = { name: name, lat: lat, lng: lng };
+                if(btn) btn.classList.add('active');
+                console.log(`AR Tracking locked to ${name}`);
+            }
+        };
+
+
+        // ==========================================
+        // --- DYNAMIC JSON & POPUP BUILDER ---
+        // ==========================================
+        parkSelector.addEventListener('change', async (e) => {
+            const selectedPark = e.target.value;
+            
+            if (!selectedPark) {
+                dynamicPoiLayer.clearLayers();
+                routeLayer.clearLayers();
+                window.SELECTED_POI = null;
+                window.AR_TARGET = null;
+                return;
+            }
+
+            try {
+                const response = await fetch(`./parks/${selectedPark}.json`);
+                if (!response.ok) throw new Error("File not found");
+                
+                const data = await response.json();
+                dynamicPoiLayer.clearLayers();
+                const bounds = []; 
+
+                data.locations.forEach(poi => {
+                    bounds.push([poi.lat, poi.lng]);
+                    const marker = L.marker([poi.lat, poi.lng]).bindPopup(`<b>${poi.name}</b><br>Click to load data...`);
+                    
+                    marker.on('click', async () => {
+                        // 1. Set this as the general Selected POI (for Routing)
+                        window.SELECTED_POI = { lat: poi.lat, lng: poi.lng, name: poi.name };
+                        
+                        // 2. Build the base Popup HTML
+                        let popupHtml = `<b>${poi.name}</b><br>⏳ Fetching weather...`;
+                        marker.setPopupContent(popupHtml);
+                        
+                        // 3. Fetch Weather
+               // 3. Fetch Weather & Elevation (with Fallback & Source Badge)
+                        let weatherText = "⚠️ Data unavailable";
+                        
+                        try {
+                            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${poi.lat}&longitude=${poi.lng}&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`;
+                            const usgsUrl = `https://epqs.nationalmap.gov/v1/json?x=${poi.lng}&y=${poi.lat}&units=Feet&wkid=4326`;
+
+                            const [wRes, eRes] = await Promise.all([
+                                fetch(weatherUrl),
+                                fetch(usgsUrl).catch(() => null)
+                            ]);
+
+                            const wData = await wRes.json();
+                            let temp = "--", wind = "--", finalElev = "--";
+                            let elevSource = "OM"; // Default source
+                            
+                            if (wData && wData.current_weather) {
+                                temp = wData.current_weather.temperature;
+                                wind = wData.current_weather.windspeed;
+                                finalElev = (wData.elevation * 3.28084).toFixed(0); 
+                            }
+
+                            if (eRes && eRes.ok) {
+                                const eData = await eRes.json();
+                                if (eData && eData.value !== undefined && eData.value !== "-1000000") {
+                                    finalElev = parseFloat(eData.value).toFixed(0);
+                                    elevSource = "USGS"; // Switch source to USGS
+                                }
+                            }
+
+                            // Build the tiny visual capsule
+                            // We use a dark background with white text and rounded edges
+                            const badgeHtml = `<span style="background-color: #555; color: white; padding: 2px 6px; border-radius: 12px; font-size: 10px; font-weight: bold; margin-left: 6px; vertical-align: middle;">${elevSource}</span>`;
+
+                            // Build the final text
+                            weatherText = `🌡️ Temp: ${temp}°F<br>💨 Wind: ${wind} mph<br>⛰️ Elev: ${finalElev} ft ${badgeHtml}`;
+                            
+                        } catch (err) { 
+                            console.error("Data fetch failed:", err); 
+                        }
+
+                        // 4. Inject the AR Button (if the JSON says has_ar: true)
+                        let arButtonHtml = '';
+                        if (poi.has_ar) {
+                            // Check if this specific POI is already the active AR target so the button opens in the "green" state
+                            const isActive = window.AR_TARGET && window.AR_TARGET.name === poi.name;
+                            const btnClass = isActive ? 'popup-ar-btn active' : 'popup-ar-btn';
+                            
+                            arButtonHtml = `<br><button id="popup-ar-btn" class="${btnClass}" onclick="window.toggleAR('${poi.name}', ${poi.lat}, ${poi.lng})">Enable AR</button>`;
+                        }
+
+                        // 5. Render Final Popup
+                        marker.setPopupContent(`<b>${poi.name}</b><br>${weatherText}${arButtonHtml}`);
+                    });
+
+                    dynamicPoiLayer.addLayer(marker);
+                });
+
+                if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
+
+            } catch (error) {
+                console.error("Error loading park data:", error);
+                alert("Could not load data for that location.");
+            }
+        });
+
+        // --- ROUTING LOGIC (OSRM) ---
+        // Now exclusively uses window.SELECTED_POI
+        btnRoute.addEventListener('click', async () => {
+            if (!latestFix) return alert("Waiting for GPS...");
+            if (!window.SELECTED_POI) return alert("Please click a map pin to select a destination first!");
+
+            btnRoute.innerText = "Calculating...";
+            const startStr = `${latestFix.lng},${latestFix.lat}`;
+            const endStr = `${window.SELECTED_POI.lng},${window.SELECTED_POI.lat}`;
+            const url = `https://router.project-osrm.org/route/v1/driving/${startStr};${endStr}?overview=full&geometries=geojson`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.code === 'Ok') {
+                    routeLayer.clearLayers();
+                    const routeCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); 
+                    const routeLine = L.polyline(routeCoords, {color: 'blue', weight: 5, dashArray: '10, 10', opacity: 0.7});
+                    routeLine.addTo(routeLayer);
+                    map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+
+                    const miles = (data.routes[0].distance * 0.000621371).toFixed(1);
+                    const minutes = (data.routes[0].duration / 60).toFixed(0);
+                    
+                    // Optional: You could show an alert or a toast notification here with the distance.
+                    console.log(`Route plotted to ${window.SELECTED_POI.name}: ${miles} miles.`);
+                    btnRoute.innerText = "Update Route";
+                } else {
+                    alert("Could not find a driving route.");
+                    btnRoute.innerText = "Show Route";
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Routing failed.");
+                btnRoute.innerText = "Show Route";
+            }
+        });
+
+
+        // --- COMPASS & AR CAMERA LOGIC ---
+        btnCompass.addEventListener('click', () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(r => {
+                    if (r === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+                    } else alert("Denied");
+                });
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+            }
+        });
+
+        function handleOrientation(e) {
+            let heading = 0;
+            if (e.webkitCompassHeading) heading = e.webkitCompassHeading;
+            else if (e.alpha !== null) heading = 360 - e.alpha; 
+            deviceHeading = heading;
+            updateAR(); 
+        }
+
+        function updateAR() {
+            // Uses window.AR_TARGET exclusively
+            if (!latestFix || !isCameraOn || !window.AR_TARGET) {
+                arOverlay.style.display = 'none';
+                return;
+            }
+
+            const userLoc = L.latLng(latestFix.lat, latestFix.lng);
+            const poiLoc = L.latLng(window.AR_TARGET.lat, window.AR_TARGET.lng);
+            const distFeet = userLoc.distanceTo(poiLoc) * 3.28084;
+
+            const y = Math.sin(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180);
+            const x = Math.cos(userLoc.lat * Math.PI/180) * Math.sin(poiLoc.lat * Math.PI/180) -
+                    Math.sin(userLoc.lat * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180) * Math.cos(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180);
+            
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            bearing = (bearing + 360) % 360; 
+
+            let diff = bearing - deviceHeading;
+            while (diff < -180) diff += 360;
+            while (diff > 180) diff -= 360;
+
+            debugDiv.innerHTML = `DEBUG: Tgt ${window.AR_TARGET.name}<br>Dist ${distFeet.toFixed(0)}ft<br>Hdg ${deviceHeading.toFixed(0)}°<br>Brng ${bearing.toFixed(0)}°`;
+
+            if (distFeet < 3000) { 
+                arOverlay.style.display = 'block';
+                arText.innerText = window.AR_TARGET.name;
+                arDist.innerText = distFeet.toFixed(0) + " ft";
+                
+                let screenPercent = 50 + (diff * 1.5);
+                if (screenPercent < 5) screenPercent = 5;
+                if (screenPercent > 95) screenPercent = 95;
+                arOverlay.style.left = screenPercent + "%";
+                arOverlay.style.opacity = Math.abs(diff) > 45 ? "0.5" : "1.0";
+            } else {
+                arOverlay.style.display = 'none';
+            }
+        }
+
+        // --- CENTER MAP LOGIC ---
+        btnCenter.addEventListener('click', () => {
+            if (latestFix) map.setView([latestFix.lat, latestFix.lng], 16);
+            else alert("Waiting for GPS signal...");
+        });
+
+        // --- STANDARD TRACKING LOGIC ---
+        async function loadSavedTrip() {
+            try {
+                const savedPath = await get('my-hike-data');
+                if (savedPath && savedPath.length > 0) {
+                    fullPathData = savedPath;
+                    const latLngs = fullPathData.map(p => [p[0], p[1]]);
+                    pathLine.setLatLngs(latLngs);
+                    latLngs.forEach(pt => L.circleMarker(pt, {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer));
+                    
+                    let restoredDist = 0;
+                    for(let i=1; i<latLngs.length; i++) restoredDist += map.distance(latLngs[i-1], latLngs[i]);
+                    totalDistanceFeet = restoredDist * 3.28084;
+                    distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+
+                    const lastPoint = fullPathData[fullPathData.length - 1];
+                    lastLoggedFix = { lat: lastPoint[0], lng: lastPoint[1] };
+                    map.setView([lastPoint[0], lastPoint[1]], 16);
+                }
+            } catch (err) { console.error(err); }
+        }
+        loadSavedTrip();
+
+        btnCam.addEventListener('click', async () => {
+            if (!isCameraOn) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                } catch (err) { alert("Camera failed."); }
+            } else {
+                if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+                arOverlay.style.display = 'none'; 
+            }
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    latestFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    userMarker.setLatLng([latestFix.lat, latestFix.lng]);
+                    const altFeet = (latestFix.alt * 3.28084).toFixed(0);
+                    statusDiv.innerText = `GPS Active\nAcc: ${latestFix.acc.toFixed(0)}m`;
+                    elevVal.innerText = `${altFeet} ft`;
+                    updateAR(); 
+                },
+                (err) => statusDiv.innerText = "Waiting for GPS...",
+                { enableHighAccuracy: true, maximumAge: 0 }
+            );
+        }
+
+// ==========================================
+        // --- WAKE LOCK LOGIC ---
+        // ==========================================
+        async function requestWakeLock() {
+            try {
+                wakeLockSentinel = await navigator.wakeLock.request('screen');
+                btnWake.classList.add('active');
+                btnWake.innerText = "🔓"; // Open lock when active
+                
+                // If the OS forces the lock to drop (e.g., low battery mode)
+                wakeLockSentinel.addEventListener('release', () => {
+                    if (!isWakeLockRequested) {
+                        btnWake.classList.remove('active');
+                        btnWake.innerText = "🔒";
+                    }
+                });
+            } catch (err) {
+                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+                alert("Screen Wake Lock is not supported on this browser.");
+                isWakeLockRequested = false;
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        }
+
+        btnWake.addEventListener('click', async () => {
+            if (!isWakeLockRequested) {
+                isWakeLockRequested = true;
+                await requestWakeLock();
+            } else {
+                isWakeLockRequested = false;
+                if (wakeLockSentinel) {
+                    await wakeLockSentinel.release();
+                    wakeLockSentinel = null;
+                }
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        });
+
+        // THE SNEAKY QUIRK: Re-acquire the lock if they switch tabs and come back
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && isWakeLockRequested) {
+                await requestWakeLock();
+            }
+        });
+
+        btnPath.addEventListener('click', () => {
+            isPathOn = !isPathOn;
+            if (isPathOn) {
+                btnPath.textContent = "Recording...";
+                btnPath.classList.add('active');
+                if (!lastLoggedFix && latestFix) lastLoggedFix = latestFix;
+            } else {
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        btnReset.addEventListener('click', async () => {
+            if(!confirm("Reset trip?")) return;
+            fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); dotLayer.clearLayers();
+            distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+            routeLayer.clearLayers(); 
+            await del('my-hike-data');
+        });
+
+        btnGraph.addEventListener('click', () => {
+             if (fullPathData.length < 2) { alert("Not enough data."); return; }
+             const labels = [], dataPoints = [];
+             let accumDist = 0;
+             for (let i = 0; i < fullPathData.length; i++) {
+                const point = fullPathData[i];
+                if (i > 0) {
+                    const prev = fullPathData[i-1];
+                    accumDist += (map.distance([prev[0], prev[1]], [point[0], point[1]]) * 3.28084);
+                }
+                labels.push(accumDist.toFixed(0));
+                dataPoints.push((point[2] * 3.28084)); 
+             }
+             const ctx = document.getElementById('elevationChart').getContext('2d');
+             if (myChart) myChart.destroy();
+             myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Elevation (ft)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Distance (ft)' } }, y: { title: { display: true, text: 'Altitude (ft)' } } } }
+             });
+             chartModal.style.display = 'flex';
+        });
+
+        btnCloseChart.addEventListener('click', () => { chartModal.style.display = 'none'; });
+
+        setInterval(async () => {
+            if (latestFix && isPathOn) {
+                if (lastLoggedFix) {
+                    const from = L.latLng(lastLoggedFix.lat, lastLoggedFix.lng);
+                    const to = L.latLng(latestFix.lat, latestFix.lng);
+                    const distFeet = from.distanceTo(to) * 3.28084;
+                    if (distFeet > 3) {
+                        totalDistanceFeet += distFeet;
+                        distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+                    }
+                }
+                fullPathData.push([latestFix.lat, latestFix.lng, latestFix.alt, Date.now()]);
+                await set('my-hike-data', fullPathData);
+                L.circleMarker([latestFix.lat, latestFix.lng], {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer);
+                pathLine.setLatLngs(fullPathData.map(p => [p[0], p[1]]));
+                lastLoggedFix = latestFix;
+            }
+        }, 5000);
+
+    </script>
+</body>
+</html>
