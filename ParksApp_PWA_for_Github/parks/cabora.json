@@ -4,7 +4,7 @@
   "locations": [
     {
       "_note": "Trailhead & Parking",
-      "name": "Bluff Creek Trailhead (Street Parking)",
+      "name": "Bluff Creek Trailheadbutt (Street Parking)",
       "lat": 33.974900,
       "lng": -118.410279,
       "has_ar": false
@@ -24,4 +24,5 @@
       "has_ar": true
     }
   ]
+
 }
