@@ -100,7 +100,7 @@
         </div>
 
         <button id="btn-compass" class="pill-btn">Enable Compass</button>
-        <button id="btn-graph" class="pill-btn">Show Elevation Butts</button>
+        <button id="btn-graph" class="pill-btn">Show Elevation</button>
         <button id="btn-cam" class="pill-btn">Camera Off</button>
         
         <div class="btn-row">
@@ -859,14 +859,27 @@
             }
         });
 
-        // ==========================================
+       // ==========================================
         // --- SERVICE WORKER & UPDATE TOAST ---
         // ==========================================
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
+                // 1. Register the background engine
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker Registered!', reg.scope))
+                    .then(reg => {
+                        console.log('Service Worker Registered!', reg.scope);
+                        // Force the browser to immediately check GitHub for a new sw.js file
+                        reg.update(); 
+                    })
                     .catch(err => console.error('Service Worker Registration Failed!', err));
+
+                // 2. THE AGGRESSIVE AUTO-UPDATER
+                // Wait 2 seconds for the UI to render, then silently bypass the CDN to check for new HTML/JSON
+                setTimeout(() => {
+                    // { cache: 'reload' } forces the CDN to ignore its 10-minute rule
+                    fetch('./index.html', { cache: 'reload' }).catch(() => {});
+                    fetch('./parks/loc_manifest.json', { cache: 'reload' }).catch(() => {});
+                }, 2000);
             });
 
             // Listen for the custom radio signal from the Service Worker
