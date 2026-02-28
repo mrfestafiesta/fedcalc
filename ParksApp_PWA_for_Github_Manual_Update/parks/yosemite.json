@@ -1,0 +1,27 @@
+{
+  "_comment": "FILE INFO: Yosemite National Park Waypoints. Coordinates are in decimal degrees.",
+  "region_name": "Yosemite",
+  "locations": [
+    {
+      "_note": "This is the main visitor center parking lot.",
+      "name": "Yosemite Valley Visitor Center",
+      "lat": 37.7456,
+      "lng": -119.5936,
+      "has_ar": false
+    },
+    {
+      "_note": "Popular lookout spot. Road closed in winter.",
+      "name": "Glacier Point",
+      "lat": 37.7274,
+      "lng": -119.5743,
+      "has_ar": true
+    },
+    {
+      "_note": "Iconic view of El Capitan and Half Dome.",
+      "name": "Tunnel View",
+      "lat": 37.7156,
+      "lng": -119.6773,
+      "has_ar": true
+    }
+  ]
+}

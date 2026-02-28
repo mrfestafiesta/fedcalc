@@ -1,0 +1,27 @@
+{
+  "_comment": "FILE INFO: Cabora Drive (Bluff Creek Trail.) Coordinates are in decimal degrees.",
+  "region_name": "Cabora Drive",
+  "locations": [
+    {
+      "_note": "Trailhead & Parking",
+      "name": "Bluff Creek Trailhead (Street Parking)",
+      "lat": 33.974900,
+      "lng": -118.410279,
+      "has_ar": false
+    },
+    {
+      "_note": "Highest View Point.",
+      "name": "Overlook Point",
+      "lat": 33.975181,
+      "lng": -118.410534,
+      "has_ar": true
+    },
+    {
+      "_note": "Bottom of Hill / Trail Fork",
+      "name": "Bottom of Hill / Trail Fork",
+      "lat": 33.975487,
+      "lng": -118.407805,
+      "has_ar": true
+    }
+  ]
+}

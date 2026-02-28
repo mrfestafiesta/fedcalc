@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Dynamic Tracker: Decoupled AR & Routing</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; }
+        
+        #camera-container { flex: 1; position: relative; overflow: hidden; background: #111; display: none; align-items: center; justify-content: center; color: #555; }
+        #camera-container.active { display: flex; }
+        video { width: 100%; height: 100%; object-fit: cover; display: none; }
+        video.active { display: block; }
+
+        #ar-overlay { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; text-align: center; transition: left 0.1s linear; z-index: 10; }
+        .ar-bubble { background: rgba(40, 167, 69, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid white; white-space: nowrap; }
+        .ar-dist { font-size: 14px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #fff; font-weight: bold; }
+
+        #debug-console { position: absolute; top: 60px; left: 10px; background: rgba(255, 255, 0, 0.8); color: black; padding: 8px; font-size: 11px; z-index: 2000; font-family: monospace; pointer-events: none; border-radius: 4px; display: none; }
+
+        #map { flex: 1; width: 100%; }
+
+        #controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+        #data-display { background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
+        .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
+
+        .pill-btn { background-color: #444; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; width: 160px; transition: background-color 0.2s; }
+        .pill-btn.active { background-color: #28a745; }
+        #btn-route { background-color: #007bff; } 
+        #btn-reset { background: #d9534f; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-top: 5px; align-self: flex-end; }
+
+        .btn-row { display: flex; gap: 10px; align-items: center;}
+        .small-pill { width: auto; padding: 12px 15px; }
+
+        #park-selector { padding: 10px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 160px; background: white; border: 2px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); outline: none; }
+
+        .popup-ar-btn { background-color: #444; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-weight: bold; margin-top: 8px; width: 100%; transition: 0.2s; }
+        .popup-ar-btn.active { background-color: #28a745; }
+
+        #chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #chart-container { width: 95%; height: 50%; background: white; border-radius: 8px; padding: 10px; }
+        #close-chart { margin-top: 20px; padding: 10px 30px; background: white; border: none; font-weight: bold; border-radius: 50px; cursor: pointer; }
+        #status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
+
+        #zoom-warning { color: #d9534f; font-size: 13px; font-weight: bold; pointer-events: none; display: none; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        #btn-settings { position: fixed; bottom: 20px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+        #btn-settings:active { transform: scale(0.9); }
+        
+        #settings-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .settings-content { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: left; color: #333; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        #close-settings { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; color: #888; cursor: pointer; }
+        
+        .storage-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: center; }
+        .grid-header { font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .grid-cell { font-size: 14px; }
+        .name-cell { font-weight: bold; color: #444; }
+        .size-cell { font-family: monospace; color: #666; text-align: right; padding-right: 10px; }
+        .btn-clear-row { background: #d9534f; color: white; border: none; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn-clear-row:active { background: #c9302c; transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <div id="status-pill" style="display: none; opacity: 0; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 25px; z-index: 5000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 14px; font-weight: bold; pointer-events: none; transition: opacity 0.3s ease-in-out;">
+        Status Message
+    </div>
+
+    <div id="status">Initializing...</div>
+    <div id="debug-console">Waiting for GPS...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+        <div id="ar-overlay">
+            <div id="ar-text" class="ar-bubble">Target</div>
+            <div id="ar-dist" class="ar-dist">0 ft away</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        <div id="data-display">
+            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+            <button id="btn-reset">RESET TRIP</button>
+        </div>
+
+        <select id="park-selector">
+            <option value="">-- Choose Park --</option>
+        </select>
+
+        <div class="btn-row">
+            <button id="btn-route" class="pill-btn">Show Route</button>
+            <button id="btn-wake" class="pill-btn small-pill" title="Keep Screen On">🔒</button>
+        </div>
+
+        <button id="btn-compass" class="pill-btn">Enable Compass</button>
+        <button id="btn-graph" class="pill-btn">Show Elevation</button>
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        
+        <div class="btn-row">
+            <button id="btn-path" class="pill-btn">GPS Path Off</button>
+            <button id="btn-center" class="pill-btn small-pill" title="Center Map">📍</button>
+            <span id="zoom-warning">Digital Zoom</span>
+        </div>
+    </div>
+
+    <button id="btn-settings" title="Settings">⚙️</button>
+
+    <div id="settings-modal">
+        <div class="settings-content">
+            <span id="close-settings">&times;</span>
+            <h3 style="margin-top: 0; margin-bottom: 20px;">Storage Management</h3>
+            
+            <div class="storage-grid">
+                <div class="grid-header">Data Type</div>
+                <div class="grid-header" style="text-align: right; padding-right: 10px;">Size</div>
+                <div class="grid-header" style="text-align: center;">Action</div>
+
+                <div class="grid-cell name-cell">App Data</div>
+                <div class="grid-cell size-cell" id="size-app">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-app" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">Map Data</div>
+                <div class="grid-cell size-cell" id="size-map">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-map" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">POI Data</div>
+                <div class="grid-cell size-cell" id="size-poi">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-poi" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">Path Data</div>
+                <div class="grid-cell size-cell" id="size-path">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-path" class="btn-clear-row">Clear</button></div>
+            </div>
+
+            <button id="btn-force-update" style="margin-top: 20px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: 0.2s;">Check for Updates</button>
+
+        </div>
+    </div>
+
+    <div id="chart-modal">
+        <div id="chart-container"><canvas id="elevationChart"></canvas></div>
+        <button id="close-chart">Close Graph</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="module">
+        import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
+
+        let latestFix = null;       // Stores the most recent user GPS coordinates and accuracy
+        let lastLoggedFix = null;   // Stores the last coordinate saved to the path array to calculate distance traveled
+        let deviceHeading = 0;      // Stores the current compass heading in degrees (0-360)
+        let fullPathData = [];      // Array holding all recorded GPS points for the active session
+        let totalDistanceFeet = 0;  // Running total of feet traveled by the user
+        let isCameraOn = false;     // Boolean tracking if the AR video feed is currently active
+        let isPathOn = false;       // Boolean tracking if the app is actively recording breadcrumbs
+        let currentStream = null;   // Holds the active WebRTC video stream so it can be stopped later
+        let myChart = null;         // Holds the Chart.js instance to allow destroying/redrawing the graph
+        let wakeLockSentinel = null;// Holds the active Wake Lock object to prevent the screen from sleeping
+        let isWakeLockRequested = false; // Boolean tracking if the user wants the screen forced on
+        
+        window.SELECTED_POI = null; // Globally accessible variable holding the map pin selected for routing
+        window.AR_TARGET = null;    // Globally accessible variable holding the map pin selected for the AR camera
+
+        const statusDiv = document.getElementById('status');            // UI container for the GPS accuracy readout
+        const debugDiv = document.getElementById('debug-console');      // UI container for raw mathematical AR data
+        const arOverlay = document.getElementById('ar-overlay');        // The floating AR UI wrapper over the camera
+        const arText = document.getElementById('ar-text');              // Text element displaying the AR target name
+        const arDist = document.getElementById('ar-dist');              // Text element displaying the distance in the AR bubble
+        const btnWake = document.getElementById('btn-wake');            // Button to toggle the Screen Wake Lock
+        const btnCompass = document.getElementById('btn-compass');      // Button to request gyroscope permissions on iOS
+        const btnCam = document.getElementById('btn-cam');              // Button to turn the device camera on/off
+        const btnPath = document.getElementById('btn-path');            // Button to start/stop recording GPS tracks
+        const btnCenter = document.getElementById('btn-center');        // Button to snap the map back to the user's location
+        const btnReset = document.getElementById('btn-reset');          // Button to wipe the current active path data
+        const btnGraph = document.getElementById('btn-graph');          // Button to trigger the elevation chart modal
+        const btnRoute = document.getElementById('btn-route');          // Button to request a driving/walking route from OSRM
+        const parkSelector = document.getElementById('park-selector');  // Dropdown menu to load specific JSON park data
+        const videoElement = document.getElementById('video-feed');     // The HTML5 video element displaying the camera
+        const cameraContainer = document.getElementById('camera-container');  // The physical div holding the video
+        const camPlaceholder = document.getElementById('camera-placeholder'); // The text shown when the camera is off
+        const distVal = document.getElementById('dist-val');                  // UI text displaying total distance traveled
+        const elevVal = document.getElementById('elev-val');                  // UI text displaying current GPS elevation
+        const chartModal = document.getElementById('chart-modal');            // The full-screen overlay holding the elevation chart
+        const btnCloseChart = document.getElementById('close-chart');         // Button to hide the elevation chart modal
+
+        async function loadParkMenu() {
+            // Fetches the manifest JSON file to dynamically populate the park selection dropdown on load
+            try {
+                // Attempts to request the manifest list and parse it so we can loop through the parks
+                const response = await fetch('./parks/loc_manifest.json'); // Fetches the master directory of available parks
+                if (!response.ok) throw new Error("Manifest not found");
+                
+                const parkList = await response.json(); // Parses the raw manifest response into a usable JS array
+                
+                parkList.forEach(park => {
+                    // Iterates over every park in the manifest to create an HTML option tag for the dropdown menu
+                    const option = document.createElement('option'); // Creates a new blank dropdown choice
+                    option.value = park.id;       
+                    option.textContent = park.name; 
+                    parkSelector.appendChild(option);
+                });
+            } catch (err) {
+                // Catches network errors if the manifest fails to load, preventing a total app crash
+                console.error("Failed to load park directory:", err);
+            }
+        }
+        
+        loadParkMenu();
+
+        const map = L.map('map').setView([0, 0], 2); // Initializes the core Leaflet map instance centered on the equator
+
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            // Defines the standard vector street map layer using OpenStreetMap public tiles
+            attribution: '© OpenStreetMap',
+            maxNativeZoom: 19,
+            maxZoom: 21 
+        });
+        
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            // Defines the high-resolution photographic layer using Esri's World Imagery service
+            attribution: 'Tiles © Esri',
+            maxNativeZoom: 19,
+            maxZoom: 21
+        });
+
+        osmLayer.addTo(map);
+
+        const baseMaps = {
+            // Packages the two tile layers into an object so Leaflet can build a toggle interface
+            "Street Map": osmLayer,
+            "Satellite": satelliteLayer
+        };
+
+        L.control.layers(baseMaps).addTo(map);
+
+        const zoomWarning = document.getElementById('zoom-warning'); // UI span element that alerts the user to digital stretching
+        
+        map.on('zoomend', () => {
+            // Triggers every time the user finishes pinching or zooming the map to check if we exceeded native resolution
+            if (map.getZoom() > 19) {
+                // Displays the digital zoom warning if the user forces the map past the server's available images
+                zoomWarning.style.display = 'block';
+            } else {
+                // Hides the digital zoom warning when the user zooms back out to standard resolution
+                zoomWarning.style.display = 'none';
+            }
+        });
+        
+        const userMarker = L.marker([0, 0]).addTo(map); // The blue dot representing the user's current live location
+        const pathLine = L.polyline([], {color: 'red', weight: 4}).addTo(map); // The solid red line showing the recorded breadcrumb trail
+        const routeLayer = L.layerGroup().addTo(map); // A container layer specifically for holding OSRM routing lines
+        const dotLayer = L.layerGroup().addTo(map); // A container layer specifically for holding the individual 5-second GPS markers
+        const dynamicPoiLayer = L.layerGroup().addTo(map); // A container layer for holding the selectable park pins from JSON
+
+        window.toggleAR = function(name, lat, lng) {
+            // A globally accessible function triggered by clicking the HTML button inside a Leaflet map popup
+            const btn = document.getElementById('popup-ar-btn'); // Finds the specific AR button inside the currently open popup
+            
+            if (window.AR_TARGET && window.AR_TARGET.name === name) {
+                // Disables AR tracking if the user clicks the button for a target that is already active
+                window.AR_TARGET = null;
+                if(btn) btn.classList.remove('active');
+                console.log(`AR Tracking disabled for ${name}`);
+            } else {
+                // Enables AR tracking and locks the global target variables to the newly selected map pin
+                window.AR_TARGET = { name: name, lat: lat, lng: lng };
+                if(btn) btn.classList.add('active');
+                console.log(`AR Tracking locked to ${name}`);
+            }
+        };
+
+        parkSelector.addEventListener('change', async (e) => {
+            // Triggers when the user selects a new park from the dropdown menu to load its specific POI data
+            const selectedPark = e.target.value; // Extracts the exact ID of the newly selected park
+            
+            if (!selectedPark) {
+                // Wipes all data from the map if the user selects the blank default dropdown option
+                dynamicPoiLayer.clearLayers();
+                routeLayer.clearLayers();
+                window.SELECTED_POI = null;
+                window.AR_TARGET = null;
+                return;
+            }
+
+            try {
+                // Attempts to fetch the specific JSON file for the chosen park and render its pins
+                const response = await fetch(`./parks/${selectedPark}.json`); // Requests the specific park data file
+                if (!response.ok) throw new Error("File not found");
+                
+                const data = await response.json(); // Parses the park data file into a usable JS object
+                dynamicPoiLayer.clearLayers();
+                const bounds = []; // Array used to calculate the physical bounding box to center the camera
+
+                data.locations.forEach(poi => {
+                    // Iterates through every POI in the park's JSON array to place markers on the map
+                    bounds.push([poi.lat, poi.lng]);
+                    const marker = L.marker([poi.lat, poi.lng]).bindPopup(`<b>${poi.name}</b><br>Click to load data...`); // Creates a physical pin with a temporary loading popup
+                    
+                    marker.on('click', async () => {
+                        // Triggers when a user clicks a specific pin to load routing targets and fetch live API data
+                        window.SELECTED_POI = { lat: poi.lat, lng: poi.lng, name: poi.name };
+                        let popupHtml = `<b>${poi.name}</b><br>⏳ Fetching weather...`; // Temporary text shown while awaiting network responses
+                        marker.setPopupContent(popupHtml);
+                        
+                        let weatherText = "⚠️ Data unavailable"; // Fallback text used if both APIs fail to respond
+                        try {
+                            // Attempts to hit the Meteo and USGS APIs simultaneously to gather weather and elevation
+                            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${poi.lat}&longitude=${poi.lng}&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`; // The Open-Meteo URL string
+                            const usgsUrl = `https://epqs.nationalmap.gov/v1/json?x=${poi.lng}&y=${poi.lat}&units=Feet&wkid=4326`; // The official USGS URL string
+
+                            const [wRes, eRes] = await Promise.all([
+                                // Executes both network fetches in parallel so the user doesn't wait twice as long
+                                fetch(weatherUrl),
+                                fetch(usgsUrl).catch(() => null)
+                            ]);
+
+                            const wData = await wRes.json(); // Parses the Open-Meteo weather response
+                            let temp = "--", wind = "--", finalElev = "--"; // Initializes fallback variables for the popup UI
+                            let elevSource = "OM"; // Tracks which API successfully provided the elevation data
+                            
+                            if (wData && wData.current_weather) {
+                                // Assigns Open-Meteo data to the UI variables if the API responded correctly
+                                temp = wData.current_weather.temperature;
+                                wind = wData.current_weather.windspeed;
+                                finalElev = (wData.elevation * 3.28084).toFixed(0); 
+                            }
+
+                            if (eRes && eRes.ok) {
+                                // Overrides the Open-Meteo elevation with highly accurate USGS data if USGS didn't timeout
+                                const eData = await eRes.json(); // Parses the USGS response
+                                if (eData && eData.value !== undefined && eData.value !== "-1000000") {
+                                    // Confirms USGS sent real data (not a null sea-level error) before applying it
+                                    finalElev = parseFloat(eData.value).toFixed(0);
+                                    elevSource = "USGS"; 
+                                }
+                            }
+
+                            const badgeHtml = `<span style="background-color: #555; color: white; padding: 2px 6px; border-radius: 12px; font-size: 10px; font-weight: bold; margin-left: 6px; vertical-align: middle;">${elevSource}</span>`; // Generates a visual UI pill showing the API source
+                            weatherText = `🌡️ Temp: ${temp}°F<br>💨 Wind: ${wind} mph<br>⛰️ Elev: ${finalElev} ft ${badgeHtml}`; // Combines all API data into the final formatted HTML string
+                            
+                        } catch (err) { 
+                            // Catches full network failures to prevent the popup from crashing if offline
+                            console.error("Data fetch failed:", err); 
+                        }
+
+                        let arButtonHtml = ''; // Initializes an empty string in case the JSON says this POI does not support AR
+                        if (poi.has_ar) {
+                            // Generates the AR toggle button string only if the JSON explicitly allows it for this location
+                            const isActive = window.AR_TARGET && window.AR_TARGET.name === poi.name; // Checks if this POI is already the active AR target
+                            const btnClass = isActive ? 'popup-ar-btn active' : 'popup-ar-btn'; // Assigns the green active class if tracking is currently on
+                            arButtonHtml = `<br><button id="popup-ar-btn" class="${btnClass}" onclick="window.toggleAR('${poi.name}', ${poi.lat}, ${poi.lng})">Enable AR</button>`; // Injects the global toggle function into the HTML button
+                        }
+
+                        marker.setPopupContent(`<b>${poi.name}</b><br>${weatherText}${arButtonHtml}`); // Pushes the fully assembled weather and AR HTML into the open popup
+                    });
+
+                    dynamicPoiLayer.addLayer(marker);
+                });
+
+                if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] }); // Snaps the map camera to mathematically fit all pins perfectly
+
+            } catch (error) {
+                // Catches errors if the requested park JSON file is missing or corrupted
+                console.error("Error loading park data:", error);
+                alert("Could not load data for that location.");
+            }
+        });
+
+        btnRoute.addEventListener('click', async () => {
+            // Triggers a network request to OSRM to calculate a driving/walking path to the selected POI
+            if (!latestFix) return alert("Waiting for GPS...");
+            if (!window.SELECTED_POI) return alert("Please click a map pin to select a destination first!");
+
+            btnRoute.innerText = "Calculating...";
+            const startStr = `${latestFix.lng},${latestFix.lat}`; // Formats the user's location for the OSRM URL
+            const endStr = `${window.SELECTED_POI.lng},${window.SELECTED_POI.lat}`; // Formats the target's location for the OSRM URL
+            const url = `https://router.project-osrm.org/route/v1/driving/${startStr};${endStr}?overview=full&geometries=geojson`; // Assembles the full API routing request
+
+            try {
+                // Attempts to fetch and map the physical driving route coordinates
+                const response = await fetch(url); // Requests the driving geometry from OSRM
+                const data = await response.json(); // Parses the OSRM routing data
+
+                if (data.code === 'Ok') {
+                    // Draws the route on the map if OSRM successfully found a connected road path
+                    routeLayer.clearLayers();
+                    const routeCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // Reverses GeoJSON [lng, lat] into Leaflet [lat, lng] array
+                    const routeLine = L.polyline(routeCoords, {color: 'blue', weight: 5, dashArray: '10, 10', opacity: 0.7}); // Creates a dashed blue visual line
+                    routeLine.addTo(routeLayer);
+                    map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+
+                    console.log(`Route plotted to ${window.SELECTED_POI.name}`);
+                    btnRoute.innerText = "Update Route";
+                } else {
+                    // Alerts the user if OSRM could not find a valid road connecting the two points
+                    alert("Could not find a driving route.");
+                    btnRoute.innerText = "Show Route";
+                }
+            } catch (e) {
+                // Catches network errors if OSRM is down or the device is completely offline
+                console.error(e);
+                alert("Routing failed.");
+                btnRoute.innerText = "Show Route";
+            }
+        });
+
+        btnCompass.addEventListener('click', () => {
+            // Requests gyroscope permissions from the OS, primarily required by iOS Safari security rules
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // Executes the strict permission request flow specifically for modern iOS devices
+                DeviceOrientationEvent.requestPermission().then(r => {
+                    // Handles the result of the iOS user permission prompt
+                    if (r === 'granted') {
+                        // Activates the compass listener and hides the prompt button if iOS grants access
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+                    } else alert("Denied");
+                });
+            } else {
+                // Silently attaches the compass listener for Android devices that don't require user prompts
+                window.addEventListener('deviceorientation', handleOrientation);
+                btnCompass.style.display = 'none'; debugDiv.style.display = 'block';
+            }
+        });
+
+        function handleOrientation(e) {
+            // Standardizes device compass heading data across different operating systems (Android vs iOS)
+            let heading = 0; // Initializes the default heading variable
+            if (e.webkitCompassHeading) heading = e.webkitCompassHeading;
+            else if (e.alpha !== null) heading = 360 - e.alpha; 
+            deviceHeading = heading;
+            updateAR(); 
+        }
+
+        function updateAR() {
+            // Recalculates the math to position the green AR bubble on the video screen based on the current compass heading
+            if (!latestFix || !isCameraOn || !window.AR_TARGET) {
+                // Hides the AR overlay entirely if the user lacks GPS, disabled the camera, or deselected a target
+                arOverlay.style.display = 'none';
+                return;
+            }
+
+            const userLoc = L.latLng(latestFix.lat, latestFix.lng); // Wraps user coords into a Leaflet object for distance math
+            const poiLoc = L.latLng(window.AR_TARGET.lat, window.AR_TARGET.lng); // Wraps target coords into a Leaflet object
+            const distFeet = userLoc.distanceTo(poiLoc) * 3.28084; // Calculates physical distance and converts meters to feet
+
+            const y = Math.sin(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180); // Calculates the Y axis spherical trajectory
+            const x = Math.cos(userLoc.lat * Math.PI/180) * Math.sin(poiLoc.lat * Math.PI/180) -
+                    Math.sin(userLoc.lat * Math.PI/180) * Math.cos(poiLoc.lat * Math.PI/180) * Math.cos(poiLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180); // Calculates the X axis spherical trajectory
+            
+            let bearing = Math.atan2(y, x) * 180 / Math.PI; // Computes the absolute bearing angle between the user and target
+            bearing = (bearing + 360) % 360; 
+
+            let diff = bearing - deviceHeading; // Calculates how many degrees off-center the user is looking
+            while (diff < -180) diff += 360; // Normalizes massive negative spin numbers
+            while (diff > 180) diff -= 360; // Normalizes massive positive spin numbers
+
+            debugDiv.innerHTML = `DEBUG: Tgt ${window.AR_TARGET.name}<br>Dist ${distFeet.toFixed(0)}ft<br>Hdg ${deviceHeading.toFixed(0)}°<br>Brng ${bearing.toFixed(0)}°`; // Injects raw math data into the yellow debug box for dev testing
+
+            if (distFeet < 3000) { 
+                // Displays the floating AR bubble only if the target is within a visually logical distance
+                arOverlay.style.display = 'block';
+                arText.innerText = window.AR_TARGET.name;
+                arDist.innerText = distFeet.toFixed(0) + " ft";
+                
+                let screenPercent = 50 + (diff * 1.5); // Maps the degree difference to a physical percentage of the phone screen width
+                if (screenPercent < 5) screenPercent = 5; // Hard-caps the bubble from flying off the left edge of the screen
+                if (screenPercent > 95) screenPercent = 95; // Hard-caps the bubble from flying off the right edge of the screen
+                arOverlay.style.left = screenPercent + "%";
+                arOverlay.style.opacity = Math.abs(diff) > 45 ? "0.5" : "1.0"; // Fades the bubble out if the user is looking away from the target
+            } else {
+                // Hides the AR UI completely if the user is too far away to logically see the target
+                arOverlay.style.display = 'none';
+            }
+        }
+
+        btnCenter.addEventListener('click', () => {
+            // Snaps the Leaflet map view back to the user's current GPS location at zoom level 16
+            if (latestFix) map.setView([latestFix.lat, latestFix.lng], 16);
+            else alert("Waiting for GPS signal...");
+        });
+
+        async function loadSavedTrip() {
+            // Fires on app load to pull any existing GPS track out of IndexedDB so the user doesn't lose data on refresh
+            try {
+                // Attempts to pull the saved hiking array out of the browser's persistent database
+                const savedPath = await get('my-hike-data'); // Fetches the raw array from idb-keyval
+                if (savedPath && savedPath.length > 0) {
+                    // Rebuilds the visual path lines and UI math if the database actually contained an active hike
+                    fullPathData = savedPath;
+                    const latLngs = fullPathData.map(p => [p[0], p[1]]); // Strips elevation data out to format specifically for Leaflet lines
+                    pathLine.setLatLngs(latLngs);
+                    latLngs.forEach(pt => L.circleMarker(pt, {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer));
+                    
+                    let restoredDist = 0; // Initializes a temporary variable to recalculate the historic distance mathematically
+                    for(let i=1; i<latLngs.length; i++) {
+                        // Loops through the historic coordinates to measure the physical distance between every consecutive point
+                        restoredDist += map.distance(latLngs[i-1], latLngs[i]);
+                    }
+                    totalDistanceFeet = restoredDist * 3.28084;
+                    distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+
+                    const lastPoint = fullPathData[fullPathData.length - 1]; // Extracts the final known location to set the map center
+                    lastLoggedFix = { lat: lastPoint[0], lng: lastPoint[1] };
+                    map.setView([lastPoint[0], lastPoint[1]], 16);
+                }
+            } catch (err) { 
+                // Silently fails if IndexedDB crashes, as a new user won't have data anyway
+                console.error(err); 
+            }
+        }
+        loadSavedTrip();
+
+      btnCam.addEventListener('click', async () => {
+            // Toggles the phone's physical rear camera and dynamically splits the screen
+            if (!isCameraOn) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    
+                    cameraContainer.classList.add('active'); // Reveals the top half of the screen
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                    
+                    // Gives the browser 100ms to physically resize the flexbox before telling Leaflet to redraw
+                    setTimeout(() => map.invalidateSize(), 100); 
+                } catch (err) { 
+                    alert("Camera failed."); 
+                }
+            } else {
+                if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+                
+                cameraContainer.classList.remove('active'); // Hides the top half, making map full screen
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+                arOverlay.style.display = 'none'; 
+                
+                // Redraws the map to fill the newly available 100% screen space
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        });
+
+        if (navigator.geolocation) {
+            // Binds to the device's hardware GPS chip to constantly stream location updates
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    // Updates the global fix variables and UI every time the OS registers physical movement
+                    latestFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    userMarker.setLatLng([latestFix.lat, latestFix.lng]);
+                    const altFeet = (latestFix.alt * 3.28084).toFixed(0); // Converts native meters to feet for the UI
+                    statusDiv.innerText = `GPS Active\nAcc: ${latestFix.acc.toFixed(0)}m`;
+                    elevVal.innerText = `${altFeet} ft`;
+                    updateAR(); 
+                },
+                (err) => statusDiv.innerText = "Waiting for GPS...", // Warns user if GPS signal is lost
+                { enableHighAccuracy: true, maximumAge: 0 } // Forces hardware GPS usage instead of weak IP triangulation
+            );
+        }
+
+        async function requestWakeLock() {
+            // Asks the mobile browser for permission to block the screen from automatically going black
+            try {
+                // Requests the 'screen' wake lock from the navigator API
+                wakeLockSentinel = await navigator.wakeLock.request('screen');
+                btnWake.classList.add('active');
+                btnWake.innerText = "🔓";
+                
+                wakeLockSentinel.addEventListener('release', () => {
+                    // Restores the visual button state to locked/off if the OS forcibly drops the lock (e.g. low battery)
+                    if (!isWakeLockRequested) {
+                        // Only updates the UI if the release wasn't intentionally triggered by the user
+                        btnWake.classList.remove('active');
+                        btnWake.innerText = "🔒";
+                    }
+                });
+            } catch (err) {
+                // Alerts the user gracefully if their browser entirely lacks support for the Wake Lock API
+                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+                alert("Screen Wake Lock is not supported on this browser.");
+                isWakeLockRequested = false;
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        }
+
+        btnWake.addEventListener('click', async () => {
+            // Toggles the explicit user request state for the Screen Wake Lock
+            if (!isWakeLockRequested) {
+                // Triggers the request function if the lock is currently off
+                isWakeLockRequested = true;
+                await requestWakeLock();
+            } else {
+                // Manually destroys the active sentinel object if the user turns the lock off
+                isWakeLockRequested = false;
+                if (wakeLockSentinel) {
+                    // Ensures we don't call release on a null object, which would throw an error
+                    await wakeLockSentinel.release();
+                    wakeLockSentinel = null;
+                }
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        });
+
+        document.addEventListener('visibilitychange', async () => {
+            // Listens for tab switching to counteract the browser's habit of destroying wake locks in the background
+            if (document.visibilityState === 'visible' && isWakeLockRequested) {
+                // Automatically re-applies the lock the exact second the user switches back to the app tab
+                await requestWakeLock();
+            }
+        });
+
+        btnPath.addEventListener('click', () => {
+            // Toggles the state boolean that allows the 5-second interval to push data into the tracking array
+            isPathOn = !isPathOn;
+            if (isPathOn) {
+                // Updates the UI to show active recording state and sets the baseline coordinate for distance math
+                btnPath.textContent = "Recording...";
+                btnPath.classList.add('active');
+                if (!lastLoggedFix && latestFix) lastLoggedFix = latestFix;
+            } else {
+                // Reverts UI to neutral state without destroying the collected data
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        btnReset.addEventListener('click', async () => {
+            // Utterly obliterates all active routing lines, arrays, mathematical counters, and IndexedDB history
+            if(!confirm("Reset trip?")) return;
+            fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); dotLayer.clearLayers();
+            distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+            routeLayer.clearLayers(); 
+            await del('my-hike-data'); // Reaches into the browser storage and deletes the persistent array
+        });
+
+        btnGraph.addEventListener('click', () => {
+             // Generates the elevation profile chart by iterating through the stored GPS path array
+             if (fullPathData.length < 2) { alert("Not enough data."); return; } // Prevents Chart.js from crashing if there are no points
+             const labels = [], dataPoints = []; // Initializes arrays to feed the X and Y axes of the chart
+             let accumDist = 0; // Tracks the running X-axis distance for the graph labels
+             for (let i = 0; i < fullPathData.length; i++) {
+                // Loops over the entire recorded path to format the raw data for Chart.js
+                const point = fullPathData[i]; // Extracts the specific data point for this iteration
+                if (i > 0) {
+                    // Skips distance math on the very first point because there is no previous point to compare it to
+                    const prev = fullPathData[i-1]; // Grabs the previous point
+                    accumDist += (map.distance([prev[0], prev[1]], [point[0], point[1]]) * 3.28084); // Adds the specific feet traveled during this segment
+                }
+                labels.push(accumDist.toFixed(0)); // Pushes the total distance to the X-axis label array
+                dataPoints.push((point[2] * 3.28084)); // Pushes the altitude to the Y-axis data array
+             }
+             const ctx = document.getElementById('elevationChart').getContext('2d'); // Grabs the canvas rendering context
+             if (myChart) myChart.destroy(); // Demolishes the old chart instance to prevent a messy visual overlap
+             myChart = new Chart(ctx, {
+                // Instantiates a brand new Chart.js graph using the compiled arrays
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Elevation (ft)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Distance (ft)' } }, y: { title: { display: true, text: 'Altitude (ft)' } } } }
+             });
+             chartModal.style.display = 'flex'; // Reveals the full-screen chart overlay
+        });
+
+        btnCloseChart.addEventListener('click', () => { 
+            // Closes the full-screen elevation chart modal when the user is done looking at it
+            chartModal.style.display = 'none'; 
+        });
+
+        setInterval(async () => {
+            // The core tracking loop that executes every 5000 milliseconds to log the user's journey
+            if (latestFix && isPathOn) {
+                // Ensures we only log data if the GPS hardware has a signal and the user hit "Record"
+                if (lastLoggedFix) {
+                    // Calculates the distance traveled since the last 5-second interval
+                    const from = L.latLng(lastLoggedFix.lat, lastLoggedFix.lng); // Formats previous coordinate
+                    const to = L.latLng(latestFix.lat, latestFix.lng); // Formats current coordinate
+                    const distFeet = from.distanceTo(to) * 3.28084; // Computes distance and converts to feet
+                    if (distFeet > 3) {
+                        // Filters out microscopic GPS jitter so the total distance doesn't falsely climb while standing still
+                        totalDistanceFeet += distFeet;
+                        distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+                    }
+                }
+                fullPathData.push([latestFix.lat, latestFix.lng, latestFix.alt, Date.now()]); // Appends the new point to the master array
+                await set('my-hike-data', fullPathData); // Silently saves the master array to the permanent hard drive
+                L.circleMarker([latestFix.lat, latestFix.lng], {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer); // Drops a visual dot on the map
+                pathLine.setLatLngs(fullPathData.map(p => [p[0], p[1]])); // Redraws the solid red line connecting all dots
+                lastLoggedFix = latestFix; // Updates the baseline point for the next interval math
+            }
+        }, 5000);
+
+        // ==========================================
+        // --- STORAGE UI LOGIC (Part 2: Math & Wiring) ---
+        // ==========================================
+        const CACHES = {
+            app: `app-shell`,
+            map: `map-tiles`,
+            poi: `app-data`  // Optional: You can route downloaded JSONs here later
+        };
+
+        const btnSettings = document.getElementById('btn-settings'); // Gear button that opens the storage UI
+        const settingsModal = document.getElementById('settings-modal'); // The full-screen dark overlay for settings
+        const closeSettings = document.getElementById('close-settings'); // The X button inside the settings box
+        
+        const sizeApp = document.getElementById('size-app');   // UI element holding the MB text for the core app
+        const sizeMap = document.getElementById('size-map');   // UI element holding the MB text for map tiles
+        const sizePoi = document.getElementById('size-poi');   // UI element holding the MB text for downloaded JSONs
+        const sizePath = document.getElementById('size-path'); // UI element holding the MB text for the IndexedDB path
+
+        async function getCacheSizeMB(cacheName, isTiles = false) {
+            // Checks the physical hard drive size of a specific Cache API bucket and converts it to Megabytes
+            if (!('caches' in window)) return "0.00"; // Aborts immediately if the browser lacks cache support
+            try {
+                // Safely opens the cache and iterates over its contents to determine byte size
+                const hasCache = await caches.has(cacheName); // Checks if the bucket even exists yet
+                if (!hasCache) return "0.00";
+                
+                const cache = await caches.open(cacheName); // Opens the specific bucket
+                const requests = await cache.keys(); // Retrieves a list of all files inside
+                
+                if (isTiles) {
+                    // Uses a mathematical estimate for map tiles because cross-origin "opaque" files hide their true size
+                    const totalBytes = requests.length * 25 * 1024; // Multiplies file count by an average 25KB
+                    return (totalBytes / (1024 * 1024)).toFixed(2); // Converts bytes to MB
+                } else {
+                    // Precisely adds up the exact byte size of standard local files
+                    let totalBytes = 0; // Initializes a running counter for the exact bytes
+                    for (let req of requests) {
+                        // Loops through every file in the bucket to check its size
+                        const res = await cache.match(req); // Retrieves the actual file object
+                        if (res) {
+                            // Reads the physical blob size of the file and adds it to the total
+                            const blob = await res.blob();
+                            totalBytes += blob.size;
+                        }
+                    }
+                    return (totalBytes / (1024 * 1024)).toFixed(2); // Converts precise bytes to MB
+                }
+            } catch (e) {
+                // Catches errors to prevent UI failures if the cache throws a read error
+                console.error(`Error calculating ${cacheName}:`, e);
+                return "0.00";
+            }
+        }
+
+        async function getPathSizeMB() {
+            // Checks the physical size of the user's recorded GPS path inside the IndexedDB database
+            try {
+                // Pulls the array and mathematically converts it into a byte-length string to determine storage cost
+                const data = await get('my-hike-data'); // Fetches the raw array from storage
+                if (!data || data.length === 0) return "0.00"; // Returns 0 immediately if no path exists
+                const jsonString = JSON.stringify(data); // Converts the array object into a raw text string
+                const bytes = new Blob([jsonString]).size; // Measures the exact byte size of that string
+                return (bytes / (1024 * 1024)).toFixed(4); // Converts to MB using 4 decimal points because text files are tiny
+            } catch (e) {
+                // Catches errors to prevent UI failure if IndexedDB is unreadable
+                return "0.00";
+            }
+        }
+
+        async function refreshStorageNumbers() {
+            // Coordinates the math functions to update the 4 specific UI MB rows at the exact same time
+            sizeApp.innerText = "Calc..."; sizeMap.innerText = "Calc...";
+            sizePoi.innerText = "Calc..."; sizePath.innerText = "Calc...";
+
+            sizeApp.innerText = `${await getCacheSizeMB(CACHES.app)} MB`;
+            sizeMap.innerText = `${await getCacheSizeMB(CACHES.map, true)} MB`;
+            sizePoi.innerText = `${await getCacheSizeMB(CACHES.poi)} MB`;
+            sizePath.innerText = `${await getPathSizeMB()} MB`;
+        }
+
+        btnSettings.addEventListener('click', () => {
+            // Opens the storage modal and forces an immediate recalculation of all hard drive sizes
+            settingsModal.style.display = 'flex';
+            refreshStorageNumbers(); 
+        });
+
+        closeSettings.addEventListener('click', () => {
+            // Closes the storage modal when the X is clicked
+            settingsModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            // Closes the storage modal if the user clicks anywhere in the dark area outside the white box
+            if (event.target === settingsModal) settingsModal.style.display = 'none';
+        });
+
+        document.getElementById('btn-clear-app').addEventListener('click', async () => {
+            // Deletes the core HTML and manifest files from the Cache API
+            if(confirm("Clear core app data? It will automatically redownload.")) {
+                // Asks for confirmation before wiping the bucket
+                await caches.delete(CACHES.app);
+                sizeApp.innerText = "0.00 MB";
+            }
+        });
+
+        document.getElementById('btn-clear-map').addEventListener('click', async () => {
+            // Deletes the massive bucket of Esri satellite images from the Cache API
+            if(confirm("Clear offline map tiles?")) {
+                // Asks for confirmation before wiping the map images
+                await caches.delete(CACHES.map);
+                sizeMap.innerText = "0.00 MB";
+            }
+        });
+
+        document.getElementById('btn-clear-poi').addEventListener('click', async () => {
+            // Deletes the downloaded JSON park files from the Cache API
+            if(confirm("Clear downloaded park POIs?")) {
+                // Asks for confirmation before wiping the park data
+                await caches.delete(CACHES.poi);
+                sizePoi.innerText = "0.00 MB";
+            }
+        });
+
+        document.getElementById('btn-clear-path').addEventListener('click', async () => {
+            // Deletes the active GPS track from IndexedDB and instantly wipes the visual map lines
+            if(confirm("Delete your current recorded GPS path? This cannot be undone.")) {
+                // Asks for confirmation because this deletes unique user-generated data
+                await del('my-hike-data');
+                
+                fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); 
+                dotLayer.clearLayers(); distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+                
+                sizePath.innerText = "0.0000 MB";
+            }
+        });
+
+        // ==========================================
+        // --- MANUAL APP UPDATER & SW REGISTRATION ---
+        // ==========================================
+        
+        // Helper function to show the top pill
+        function showStatusPill(message, bgColor = '#333') {
+            const pill = document.getElementById('status-pill');
+            pill.innerText = message;
+            pill.style.background = bgColor;
+            pill.style.display = 'block';
+            
+            // Fade in
+            setTimeout(() => pill.style.opacity = '1', 10);
+            
+            // Fade out after 3 seconds
+            setTimeout(() => {
+                pill.style.opacity = '0';
+                setTimeout(() => pill.style.display = 'none', 300);
+            }, 3000);
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => console.log('Vault Service Worker Registered!'))
+                    .catch(err => console.error('SW Registration Failed!', err));
+
+                // CHECK FOR REBIRTH: Did the app just reload from an update?
+                if (sessionStorage.getItem('appJustUpdated') === 'true') {
+                    // Clear the flag so it doesn't show again on normal reloads
+                    sessionStorage.removeItem('appJustUpdated');
+                    // Show the success pill!
+                    showStatusPill('App Update Complete ✅', '#28a745');
+                }
+            });
+        }
+
+        // THE MANUAL UPDATE BUTTON LOGIC
+        document.getElementById('btn-force-update').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-force-update');
+            const originalText = btn.innerText;
+            btn.innerText = "Checking...";
+            
+            try {
+                const shellCache = await caches.open('tracker-shell-v1');
+                const dataCache = await caches.open('tracker-data-v1');
+                let updatesFound = false;
+
+                // 1. Check App Shell (HTML)
+                const liveHtmlRes = await fetch('./index.html', { cache: 'no-store' });
+                const liveHtmlText = await liveHtmlRes.clone().text();
+                const cachedHtml = await shellCache.match('./index.html');
+                const cachedHtmlText = cachedHtml ? await cachedHtml.text() : '';
+
+                if (cachedHtmlText === '') {
+                    // First boot: silently store the baseline
+                    await shellCache.put('./index.html', liveHtmlRes.clone());
+                } else if (liveHtmlText !== cachedHtmlText) {
+                    await shellCache.put('./index.html', liveHtmlRes.clone());
+                    updatesFound = true;
+                }
+                
+                // 2. Check Manifest
+                const liveManifestRes = await fetch('./parks/loc_manifest.json', { cache: 'no-store' });
+                const liveManifestText = await liveManifestRes.clone().text();
+                const cachedManifest = await dataCache.match('./parks/loc_manifest.json');
+                const cachedManifestText = cachedManifest ? await cachedManifest.text() : '';
+
+                if (cachedManifestText === '') {
+                    await dataCache.put('./parks/loc_manifest.json', liveManifestRes.clone());
+                } else if (liveManifestText !== cachedManifestText) {
+                    await dataCache.put('./parks/loc_manifest.json', liveManifestRes.clone());
+                    updatesFound = true;
+                }
+
+                // 3. THE DEEP SYNC: Check every individual park JSON file
+                const manifestData = await liveManifestRes.json(); // Read the live manifest
+                
+                for (const park of manifestData) {
+                    const parkUrl = `./parks/${park.id}.json`;
+                    try {
+                        const liveParkRes = await fetch(parkUrl, { cache: 'no-store' });
+                        const liveParkText = await liveParkRes.clone().text();
+                        const cachedPark = await dataCache.match(parkUrl);
+                        const cachedParkText = cachedPark ? await cachedPark.text() : '';
+
+                        if (cachedParkText === '') {
+                            // First boot or new park added: silently store it
+                            await dataCache.put(parkUrl, liveParkRes.clone());
+                        } else if (liveParkText !== cachedParkText) {
+                            // Park data was edited!
+                            await dataCache.put(parkUrl, liveParkRes.clone());
+                            updatesFound = true;
+                        }
+                    } catch (err) {
+                        console.log(`Skipping missing park file: ${parkUrl}`);
+                    }
+                }
+
+                // 4. Execute the UX
+                if (updatesFound) {
+                    // Set the rebirth flag and force the browser to wipe the screen
+                    sessionStorage.setItem('appJustUpdated', 'true');
+                    window.location.reload();
+                } else {
+                    // No changes found, reset button and show passive pill
+                    btn.innerText = originalText;
+                    showStatusPill('No Update Available', '#6c757d');
+                }
+
+            } catch (err) {
+                console.error(err);
+                btn.innerText = originalText;
+                showStatusPill('Check Failed (Offline?)', '#dc3545');
+            }
+        });
+
+    </script>
+</body>
+</html>
