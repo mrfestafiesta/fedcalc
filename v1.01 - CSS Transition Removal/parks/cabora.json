@@ -1,0 +1,38 @@
+{
+  "trail_path": [
+    [33.974900, -118.410279, 153],
+    [33.975181, -118.410534, 170.25]
+  ],
+  "locations": [
+    {
+      "name": "Bluff Creek Trailhead (Street Parking)",
+      "lat": 33.974900,
+      "lng": -118.410279,
+      "elev": 153.3,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "NW Corner"
+    },
+  {
+      "name": "Overlook Point",
+      "lat": 33.975181,
+      "lng": -118.410534,
+      "elev": 153.3,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "SW Corner"
+    },
+    {
+      "name": "Bottom of Hill / Trail Fork",
+      "lat": 33.975487,
+      "lng": -118.407805,
+      "elev": 153.3,
+      "has_ar": true,
+      "ar_type": "3d_model",
+      "ar_content": "./models/directional_arrow.glb",
+      "ar_scale": 0.5,
+      "ar_rotation": 90,
+      "ar_offset_up": 8
+    }
+  ]
+}

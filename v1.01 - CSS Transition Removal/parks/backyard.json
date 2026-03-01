@@ -1,0 +1,49 @@
+{
+  "trail_path": [
+    [33.976903, -118.402443, 170.25],
+    [33.976862, -118.402443, 170.25],
+    [33.976821, -118.402443, 170.25],
+    [33.976780, -118.402443, 170.25]
+  ],
+  "locations": [
+    {
+      "name": "NW Corner",
+      "lat": 33.976904,
+      "lng": -118.402443,
+      "elev": 170.25,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "NW Corner"
+    },
+    {
+      "name": "NE Corner",
+      "lat": 33.976897,
+      "lng": -118.402040,
+      "elev": 170.25,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "NE Corner"
+    },
+  {
+      "name": "SW Corner",
+      "lat": 33.976780,
+      "lng": -118.402446,
+      "elev": 170.25,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "SW Corner"
+    },
+    {
+      "name": "SE Corner (3D)",
+      "lat": 33.976768,
+      "lng": -118.402047,
+      "elev": 170.25,
+      "has_ar": true,
+      "ar_type": "SE Corner (3D)",
+      "ar_content": "./models/directional_arrow.glb",
+      "ar_scale": 0.5,
+      "ar_rotation": 90,
+      "ar_offset_up": 8
+    }
+  ]
+}
