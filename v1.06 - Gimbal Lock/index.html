@@ -503,41 +503,32 @@
             if (e.webkitCompassHeading) {
                 // APPLE ROAD: Natively corrected and tilt-compensated by iOS
                 heading = e.webkitCompassHeading;
-            } else if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
-                // ANDROID ROAD: 3D Tilt Compensation Math
+           } else if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
+                // ANDROID ROAD: -Z Axis Camera Projection
                 
-                // 1. Convert Euler angles from degrees to radians for JS Math functions
+                // 1. Convert Euler angles to radians
                 const degToRad = Math.PI / 180;
                 const alpha = e.alpha * degToRad;
                 const beta = e.beta * degToRad;
                 const gamma = e.gamma * degToRad;
 
-                // 2. Trigonometric projection (Rotation Matrix)
-                // Calculates where the camera lens points by projecting the 3D axes onto a flat plane
+                // 2. Precompute sines and cosines
                 const cA = Math.cos(alpha), sA = Math.sin(alpha);
                 const cB = Math.cos(beta),  sB = Math.sin(beta);
                 const cG = Math.cos(gamma), sG = Math.sin(gamma);
 
-                const rx = cA * sG - sA * sB * cG;
-                const ry = -sA * sG - cA * sB * cG;
+                // 3. Project the -Z axis (Camera Lens) into the world horizontal plane
+                const x_w = -cA * sG - sA * sB * cG;
+                const y_w = -sA * sG + cA * sB * cG;
 
-                // 3. Convert back to degrees using arctangent
-                let compassHeading = Math.atan2(rx, ry) * (180 / Math.PI);
+                // 4. Calculate true compass heading from the projected vector
+                let compassHeading = Math.atan2(x_w, y_w) * (180 / Math.PI);
 
-                // 4. Normalize to a clean 0-360 degree scale
+                // 5. Normalize to a clean 0-360 degree scale
                 if (compassHeading < 0) compassHeading += 360;
                 
-                // 5. Apply physical screen orientation offset (Portrait vs Landscape)
-                let screenOrientation = 0;
-                if (screen && screen.orientation && screen.orientation.angle !== undefined) {
-                    screenOrientation = screen.orientation.angle;
-                } else if (window.orientation !== undefined) {
-                    screenOrientation = window.orientation; // Fallback for older Androids
-                }
-                
-                // Lock in the final, stabilized Android heading
-                heading = (compassHeading + screenOrientation) % 360;
-            } 
+                heading = compassHeading;
+            }
             
             deviceHeading = heading;
             
