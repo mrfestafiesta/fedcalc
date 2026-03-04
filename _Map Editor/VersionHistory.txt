@@ -1,0 +1,62 @@
+v1.0:
+- Format draft of map editor
+
+v1.1:
+- Allows user naming of the file
+Caps GPS readout at 6 digits after decimal
+
+v1.2:
+- Format edges to have compact, single-line horizontal layout
+
+v1.3:
+- Format nodes to have compact, single-line horizontal layout 
+
+v1.4: 
+- Adds elevation data to the node and location arrays.
+- Manually Create nodes with elevation 0 by default, and once complete, pressing export triggers the
+elevation function. This checks USGS, then OM, point by point, with a 200ms delay in between 
+to not trigger the USGS server to block us. 
+
+v1.5:
+- Add a search bar to help users navigate
+- Search bar auto populates as you type
+
+v1.6:
+- Add Satellite/Street Map toggle
+
+v1.7:
+- Add toggle to select between OM elevation data (default) and USGS (high accuracy, slow loads)
+-- If user attempts to us USGS outside of US, will receive warning message
+
+v1.8:
+- Add a GPS pin to center camera on user's location
+
+v1.9:
+- UI Clean up
+
+v1.10:
+- Adds option to erases nodes and lines, and reset the entire file
+
+v1.11:
+- UI Clean up
+
+v1.12:
+- More UI Clean up
+- Move search bar into the map as overlay 
+
+v1.13:
+- Erase POI without erasing node
+- View POI by hovering 
+
+v1.14:
+- Adds JSON output for mapSource (for now, hardcoded to Map Editor Tool)
+- Adds JSON output for elevSource (USGS or OM)
+- USGS searches now bath queries in batches of 10
+- Fix Map layer and centering controls element size
+
+
+
+
+Importing / Editing Existing Maps
+
+Delete/Undo button

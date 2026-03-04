@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Graph Builder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; position: relative; }
+        
+        /* Flexbox Column Layout for Toolbar */
+        #toolbar { padding: 15px; background: #222; color: white; display: flex; gap: 15px; align-items: center; z-index: 2000; }
+        .toolbar-group { display: flex; flex-direction: column; gap: 6px; }
+        .toolbar-row { display: flex; gap: 10px; align-items: center; }
+        .vertical-divider { width: 1px; background-color: #555; height: 60px; margin: 0 10px; }
+
+        button { padding: 8px 16px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; }
+        input[type="text"], select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        .active-mode { background: #0078FF; color: white; }
+        .inactive-mode { background: #555; color: white; }
+        
+        /* THE FIX: Fully contained and centered Export Button */
+        #btnExport { 
+            background: #28a745; 
+            height: 35px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-sizing: border-box; 
+            white-space: nowrap; 
+            padding: 0 15px;
+        }
+        #btnExport:disabled { background: #555; cursor: not-allowed; }
+        
+        #status { font-family: monospace; color: #ffcc00; font-size: 13px; text-align: right; }
+        
+        .search-container { position: relative; display: flex; }
+        #suggestions { position: absolute; top: 100%; left: 0; background: white; color: black; width: 100%; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 4px; z-index: 1000; display: none; flex-direction: column; margin-top: 4px; }
+        .suggestion-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+        .suggestion-item:hover { background: #0078FF; color: white; }
+        
+        /* THE FIX: Native Leaflet Locate Control Styling */
+        .leaflet-locate-control {
+            background: white;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            border: 2px solid rgba(0,0,0,0.2);
+            background-clip: padding-box;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            /* clear:none allows it to float horizontally next to the layer control! */
+            clear: none !important; 
+            margin-right: 10px !important;
+        }
+        .leaflet-locate-control:hover { background: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        
+        <div class="toolbar-row">
+            <button id="btnNode" class="active-mode">1. Drop Nodes</button>
+            <button id="btnEdge" class="inactive-mode">2. Connect Edges</button>
+            <button id="btnPoi" class="inactive-mode">3. Tag POIs</button>
+        </div>
+        
+        <div class="vertical-divider"></div>
+
+        <div class="toolbar-row">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search a park or city..." autocomplete="off" style="width: 240px;">
+                <div id="suggestions"></div>
+            </div>
+            <select id="elevSource" style="width: 240px;">
+                <option value="OM">Elev: Open-Meteo (Fast/Global)</option>
+                <option value="USGS">Elev: USGS (Precision/US-Only)</option>
+            </select>
+        </div>
+
+        <div style="flex-grow: 1;"></div>
+
+        <div class="toolbar-group" style="align-items: flex-end;">
+            <div class="toolbar-row" style="align-items: flex-end;">
+                <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
+                    <label style="font-size: 12px; color: #aaa; margin-left: 2px;">Park Name? (no spaces)</label>
+                    <input type="text" id="fileName" value="custom_park" placeholder="Filename (no .json)" style="width: 170px;">
+                </div>
+                <button id="btnExport">⬇️ Export JSON</button>
+            </div>
+            <span id="status">Click map to place a node...</span>
+        </div>
+
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // --- INITIALIZE MAP & LAYERS ---
+        const map = L.map('map').setView([33.9769, -118.4024], 18);
+
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            maxZoom: 22,
+            maxNativeZoom: 19 
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 22,
+            maxNativeZoom: 19,
+            attribution: 'Tiles &copy; Esri'
+        });
+
+        streetLayer.addTo(map);
+
+        // This adds the standard layer control to the top right
+        const baseMaps = {
+            "Street Map": streetLayer,
+            "Satellite": satelliteLayer
+        };
+        L.control.layers(baseMaps).addTo(map);
+
+        // --- NEW: NATIVE LEAFLET LOCATE CONTROL ---
+        const LocateControl = L.Control.extend({
+            options: { position: 'topright' }, // Forces it into the same corner as the layer control
+            onAdd: function () {
+                const btn = L.DomUtil.create('div', 'leaflet-locate-control leaflet-control');
+                btn.innerHTML = '📍';
+                btn.title = 'Find My Location';
+                
+                // Prevent map from receiving click events when clicking the button
+                L.DomEvent.disableClickPropagation(btn);
+                
+                btn.onclick = () => {
+                    const status = document.getElementById('status');
+                    status.innerText = "Locating your GPS position...";
+                    if ("geolocation" in navigator) {
+                        navigator.geolocation.getCurrentPosition((position) => {
+                            map.flyTo([position.coords.latitude, position.coords.longitude], 19);
+                            status.innerText = "Moved to your current location.";
+                        }, (error) => {
+                            console.error("GPS Error:", error);
+                            status.innerText = "GPS Error. Please check browser permissions.";
+                            alert("Could not get your location. Please ensure location services are enabled for your browser.");
+                        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                    } else {
+                        alert("Geolocation is not supported by your browser.");
+                    }
+                };
+                return btn;
+            }
+        });
+        map.addControl(new LocateControl());
+
+        // --- DATA STRUCTURE ---
+        let currentMode = 'NODE'; 
+        let nodeCounter = 1;
+        let edgeStartNode = null;
+
+        const graphData = {
+            id: "custom_park",
+            name: "Custom Built Park",
+            nodes: {},
+            edges: {},
+            locations: []
+        };
+
+        // --- AUTOCOMPLETE SEARCH (PHOTON API) ---
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsBox = document.getElementById('suggestions');
+        let searchTimeout = null;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout); 
+            const query = e.target.value.trim();
+
+            if (query.length < 3) {
+                suggestionsBox.style.display = 'none'; 
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+
+                    suggestionsBox.innerHTML = ''; 
+
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach(feature => {
+                            const props = feature.properties;
+                            const lat = feature.geometry.coordinates[1];
+                            const lng = feature.geometry.coordinates[0];
+
+                            let nameParts = [];
+                            if (props.name) nameParts.push(props.name);
+                            if (props.city || props.town || props.county) nameParts.push(props.city || props.town || props.county);
+                            if (props.state) nameParts.push(props.state);
+                            const displayName = nameParts.join(', ');
+
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = displayName;
+                            
+                            div.onclick = () => {
+                                map.flyTo([lat, lng], 17);
+                                searchInput.value = displayName;
+                                suggestionsBox.style.display = 'none';
+                                document.getElementById('status').innerText = `Moved to: ${props.name || displayName}`;
+                            };
+
+                            suggestionsBox.appendChild(div);
+                        });
+                        suggestionsBox.style.display = 'flex';
+                    } else {
+                        suggestionsBox.style.display = 'none';
+                    }
+                } catch (err) {
+                    console.log("Autocomplete API failed.");
+                }
+            }, 400); 
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+        // --- MAP INTERACTION MODES ---
+        const setMode = (mode, statusText) => {
+            currentMode = mode;
+            edgeStartNode = null; 
+            // Avoid selecting the locate tool inside the map UI
+            document.querySelectorAll('#toolbar button').forEach(b => {
+                if(b.id !== 'btnExport') b.classList.replace('active-mode', 'inactive-mode');
+            });
+            document.getElementById(mode === 'NODE' ? 'btnNode' : mode === 'EDGE' ? 'btnEdge' : 'btnPoi').classList.replace('inactive-mode', 'active-mode');
+            document.getElementById('status').innerText = statusText;
+        };
+
+        document.getElementById('btnNode').onclick = () => setMode('NODE', 'Click map to place a node...');
+        document.getElementById('btnEdge').onclick = () => setMode('EDGE', 'Click a node to start a trail...');
+        document.getElementById('btnPoi').onclick = () => setMode('POI', 'Click a node to turn it into a POI...');
+
+        map.on('click', (e) => {
+            if (currentMode !== 'NODE') return;
+            const nodeId = 'n' + nodeCounter++;
+            
+            graphData.nodes[nodeId] = { 
+                lat: parseFloat(e.latlng.lat.toFixed(6)), 
+                lng: parseFloat(e.latlng.lng.toFixed(6)), 
+                elev: 0 
+            };
+            graphData.edges[nodeId] = []; 
+
+            const marker = L.circleMarker(e.latlng, { radius: 6, color: '#0078FF', fillOpacity: 1 }).addTo(map);
+            marker.bindTooltip(nodeId, { permanent: true, direction: 'right', offset: [5, 0] });
+            marker.on('click', () => handleNodeClick(nodeId, e.latlng));
+        });
+
+        function handleNodeClick(nodeId, latlng) {
+            L.DomEvent.stopPropagation(event); 
+
+            if (currentMode === 'EDGE') {
+                if (!edgeStartNode) {
+                    edgeStartNode = { id: nodeId, latlng: latlng };
+                    document.getElementById('status').innerText = `Connecting ${nodeId} to...`;
+                } else {
+                    if (edgeStartNode.id === nodeId) return; 
+
+                    if (!graphData.edges[edgeStartNode.id].includes(nodeId)) {
+                        graphData.edges[edgeStartNode.id].push(nodeId);
+                        graphData.edges[nodeId].push(edgeStartNode.id);
+                        L.polyline([edgeStartNode.latlng, latlng], { color: 'yellow', weight: 4 }).addTo(map);
+                    }
+                    edgeStartNode = null;
+                    document.getElementById('status').innerText = 'Click a node to start a trail...';
+                }
+            } 
+            else if (currentMode === 'POI') {
+                const poiName = prompt(`Enter a name for the POI at ${nodeId}:`);
+                if (poiName) {
+                    graphData.locations.push({
+                        name: poiName,
+                        node_id: nodeId,
+                        lat: parseFloat(latlng.lat.toFixed(6)),
+                        lng: parseFloat(latlng.lng.toFixed(6)),
+                        elev: 0, 
+                        has_ar: true,
+                        ar_type: "text",
+                        ar_content: poiName
+                    });
+                    L.circleMarker(latlng, { radius: 10, color: 'red', fillOpacity: 0.5 }).addTo(map);
+                    document.getElementById('status').innerText = `Added POI: ${poiName} at ${nodeId}`;
+                }
+            }
+        }
+
+        // --- SPLIT-PATH BATCH ELEVATION FETCH & EXPORT ---
+        document.getElementById('btnExport').onclick = async () => {
+            const btn = document.getElementById('btnExport');
+            const status = document.getElementById('status');
+            const elevSource = document.getElementById('elevSource').value;
+            
+            btn.disabled = true; 
+            
+            let fileNameInput = document.getElementById('fileName').value.trim() || 'custom_park';
+            graphData.id = fileNameInput; 
+            graphData.name = fileNameInput.replace(/_/g, ' ').toUpperCase(); 
+            const finalFileName = fileNameInput.endsWith('.json') ? fileNameInput : fileNameInput + '.json';
+
+            const nodeIds = Object.keys(graphData.nodes);
+
+            if (nodeIds.length > 0) {
+                if (elevSource === 'OM') {
+                    const CHUNK_SIZE = 100;
+                    for (let i = 0; i < nodeIds.length; i += CHUNK_SIZE) {
+                        const chunkIds = nodeIds.slice(i, i + CHUNK_SIZE);
+                        const endNum = Math.min(i + CHUNK_SIZE, nodeIds.length);
+                        status.innerText = `Fetching Open-Meteo Elev: ${i + 1}-${endNum} of ${nodeIds.length}...`;
+                        
+                        const lats = chunkIds.map(id => graphData.nodes[id].lat).join(',');
+                        const lngs = chunkIds.map(id => graphData.nodes[id].lng).join(',');
+
+                        try {
+                            const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
+                            const data = await res.json();
+                            if (data && data.elevation) {
+                                chunkIds.forEach((id, index) => {
+                                    graphData.nodes[id].elev = parseFloat((data.elevation[index] * 3.28084).toFixed(2));
+                                });
+                            }
+                        } catch (e) {
+                            console.log("OM Batch failed. Nodes will export with 0 elev.");
+                        }
+                    }
+                } 
+                else if (elevSource === 'USGS') {
+                    const CHUNK_SIZE = 10; 
+                    let usgsFailed = false;
+
+                    for (let i = 0; i < nodeIds.length; i += CHUNK_SIZE) {
+                        if (usgsFailed) break;
+
+                        const chunkIds = nodeIds.slice(i, i + CHUNK_SIZE);
+                        const endNum = Math.min(i + CHUNK_SIZE, nodeIds.length);
+                        status.innerText = `Fetching USGS Elev: ${i + 1}-${endNum} of ${nodeIds.length}...`;
+                        
+                        await Promise.all(chunkIds.map(async (nodeId) => {
+                            if (usgsFailed) return;
+                            const node = graphData.nodes[nodeId];
+                            
+                            try {
+                                const usgsRes = await fetch(`https://epqs.nationalmap.gov/v1/json?x=${node.lng}&y=${node.lat}&units=Meters`);
+                                if (!usgsRes.ok) throw new Error("HTTP Status Error");
+                                
+                                const usgsData = await usgsRes.json();
+                                if (usgsData && usgsData.value !== undefined && usgsData.value !== "-1000000") {
+                                    node.elev = parseFloat((usgsData.value * 3.28084).toFixed(2));
+                                } else {
+                                    throw new Error("Invalid Data format");
+                                }
+                            } catch(e) {
+                                usgsFailed = true; 
+                            }
+                        }));
+
+                        if (usgsFailed) {
+                            alert("Cannot retrieve data from USGS.\n\nPlease verify you are mapping within the United States or switch to the Open-Meteo Global engine.");
+                            btn.disabled = false;
+                            status.innerText = "Export aborted: USGS Failure.";
+                            return; 
+                        }
+
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                }
+            }
+
+            status.innerText = "Syncing POI data...";
+            graphData.locations.forEach(loc => {
+                if (loc.node_id && graphData.nodes[loc.node_id]) {
+                    loc.elev = graphData.nodes[loc.node_id].elev;
+                }
+            });
+
+            status.innerText = "Formatting JSON...";
+
+            let rawJson = JSON.stringify(graphData, null, 2);
+            let compactJson = rawJson
+                .replace(/\[\n\s+([^\]]+?)\n\s+\]/g, (match, content) => {
+                    if (content.includes('{')) return match; 
+                    return '[' + content.replace(/\n\s+/g, ' ') + ']'; 
+                })
+                .replace(/\{\n\s+"lat":\s*([0-9.-]+),\n\s+"lng":\s*([0-9.-]+),\n\s+"elev":\s*([0-9.-]+)\n\s+\}/g, '{"lat": $1, "lng": $2, "elev": $3}');
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(compactJson);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", finalFileName);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+
+            btn.disabled = false;
+            status.innerText = "✅ Export Complete!";
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Graph Builder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; }
+        #toolbar { padding: 15px; background: #222; color: white; display: flex; gap: 10px; align-items: center; }
+        button { padding: 8px 16px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; }
+        .active-mode { background: #0078FF; color: white; }
+        .inactive-mode { background: #555; color: white; }
+        #btnExport { background: #28a745; margin-left: auto; }
+        #status { margin-left: 15px; font-family: monospace; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button id="btnNode" class="active-mode">1. Drop Nodes</button>
+        <button id="btnEdge" class="inactive-mode">2. Connect Edges</button>
+        <button id="btnPoi" class="inactive-mode">3. Tag POIs</button>
+        <span id="status">Click map to place a node...</span>
+        <button id="btnExport">⬇️ Export JSON</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // Initialize Map (Centered on Los Angeles area)
+        const map = L.map('map').setView([33.9769, -118.4024], 18);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
+
+        // State Management
+        let currentMode = 'NODE'; // NODE, EDGE, POI
+        let nodeCounter = 1;
+        let edgeStartNode = null;
+
+        // The Master JSON Object
+        const graphData = {
+            id: "custom_park",
+            name: "Custom Built Park",
+            nodes: {},
+            edges: {},
+            locations: []
+        };
+
+        // UI Mode Switching
+        const setMode = (mode, statusText) => {
+            currentMode = mode;
+            edgeStartNode = null; // Reset edge drawing state
+            document.querySelectorAll('button').forEach(b => b.classList.replace('active-mode', 'inactive-mode'));
+            document.getElementById(mode === 'NODE' ? 'btnNode' : mode === 'EDGE' ? 'btnEdge' : 'btnPoi').classList.replace('inactive-mode', 'active-mode');
+            document.getElementById('status').innerText = statusText;
+            document.getElementById('btnExport').className = ''; // Keep export button styling out of the toggle
+        };
+
+        document.getElementById('btnNode').onclick = () => setMode('NODE', 'Click map to place a node...');
+        document.getElementById('btnEdge').onclick = () => setMode('EDGE', 'Click a node to start a trail...');
+        document.getElementById('btnPoi').onclick = () => setMode('POI', 'Click a node to turn it into a POI...');
+
+        // Handle Map Clicks (Only used for dropping Nodes)
+        map.on('click', (e) => {
+            if (currentMode !== 'NODE') return;
+
+            const nodeId = 'n' + nodeCounter++;
+            
+            // Add to JSON object (defaulting elevation to 0 for the builder)
+            graphData.nodes[nodeId] = { lat: e.latlng.lat, lng: e.latlng.lng, elev: 0 };
+            graphData.edges[nodeId] = []; // Initialize empty connections array
+
+            // Draw on map
+            const marker = L.circleMarker(e.latlng, { radius: 6, color: '#0078FF', fillOpacity: 1 }).addTo(map);
+            marker.bindTooltip(nodeId, { permanent: true, direction: 'right', offset: [5, 0] });
+
+            // Handle clicking ON an existing node
+            marker.on('click', () => handleNodeClick(nodeId, e.latlng));
+        });
+
+        // Handle clicking existing Nodes (For Edges and POIs)
+        function handleNodeClick(nodeId, latlng) {
+            L.DomEvent.stopPropagation(event); // Prevent map click from firing
+
+            if (currentMode === 'EDGE') {
+                if (!edgeStartNode) {
+                    edgeStartNode = { id: nodeId, latlng: latlng };
+                    document.getElementById('status').innerText = `Connecting ${nodeId} to...`;
+                } else {
+                    if (edgeStartNode.id === nodeId) return; // Can't connect to itself
+
+                    // Update JSON object bidirectionally
+                    if (!graphData.edges[edgeStartNode.id].includes(nodeId)) {
+                        graphData.edges[edgeStartNode.id].push(nodeId);
+                        graphData.edges[nodeId].push(edgeStartNode.id);
+
+                        // Draw the line
+                        L.polyline([edgeStartNode.latlng, latlng], { color: 'yellow', weight: 4 }).addTo(map);
+                    }
+                    
+                    edgeStartNode = null;
+                    document.getElementById('status').innerText = 'Click a node to start a trail...';
+                }
+            } 
+            else if (currentMode === 'POI') {
+                const poiName = prompt(`Enter a name for the POI at ${nodeId}:`);
+                if (poiName) {
+                    // Add to JSON object
+                    graphData.locations.push({
+                        name: poiName,
+                        node_id: nodeId,
+                        lat: latlng.lat,
+                        lng: latlng.lng,
+                        elev: 0,
+                        has_ar: true,
+                        ar_type: "text",
+                        ar_content: poiName
+                    });
+                    
+                    // Visually mark it
+                    L.circleMarker(latlng, { radius: 10, color: 'red', fillOpacity: 0.5 }).addTo(map);
+                    document.getElementById('status').innerText = `Added POI: ${poiName} at ${nodeId}`;
+                }
+            }
+        }
+
+        // Export Functionality
+        document.getElementById('btnExport').onclick = () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graphData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", "custom_park.json");
+            document.body.appendChild(downloadAnchorNode); // Required for Firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        };
+    </script>
+</body>
+</html>

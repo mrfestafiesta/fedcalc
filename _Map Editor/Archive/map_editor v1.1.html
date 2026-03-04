@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Graph Builder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; }
+        #toolbar { padding: 15px; background: #222; color: white; display: flex; gap: 10px; align-items: center; }
+        button { padding: 8px 16px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; }
+        input[type="text"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 150px; }
+        .active-mode { background: #0078FF; color: white; }
+        .inactive-mode { background: #555; color: white; }
+        #btnExport { background: #28a745; margin-left: auto; }
+        #status { margin-left: 15px; font-family: monospace; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button id="btnNode" class="active-mode">1. Drop Nodes</button>
+        <button id="btnEdge" class="inactive-mode">2. Connect Edges</button>
+        <button id="btnPoi" class="inactive-mode">3. Tag POIs</button>
+        <span id="status">Click map to place a node...</span>
+        
+        <input type="text" id="fileName" value="custom_park" placeholder="Filename (no .json)">
+        <button id="btnExport">⬇️ Export JSON</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([33.9769, -118.4024], 18);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
+
+        let currentMode = 'NODE'; 
+        let nodeCounter = 1;
+        let edgeStartNode = null;
+
+        const graphData = {
+            id: "custom_park",
+            name: "Custom Built Park",
+            nodes: {},
+            edges: {},
+            locations: []
+        };
+
+        const setMode = (mode, statusText) => {
+            currentMode = mode;
+            edgeStartNode = null; 
+            document.querySelectorAll('button').forEach(b => {
+                if(b.id !== 'btnExport') b.classList.replace('active-mode', 'inactive-mode');
+            });
+            document.getElementById(mode === 'NODE' ? 'btnNode' : mode === 'EDGE' ? 'btnEdge' : 'btnPoi').classList.replace('inactive-mode', 'active-mode');
+            document.getElementById('status').innerText = statusText;
+        };
+
+        document.getElementById('btnNode').onclick = () => setMode('NODE', 'Click map to place a node...');
+        document.getElementById('btnEdge').onclick = () => setMode('EDGE', 'Click a node to start a trail...');
+        document.getElementById('btnPoi').onclick = () => setMode('POI', 'Click a node to turn it into a POI...');
+
+        map.on('click', (e) => {
+            if (currentMode !== 'NODE') return;
+
+            const nodeId = 'n' + nodeCounter++;
+            
+            // NEW: Truncate to 6 decimal places
+            graphData.nodes[nodeId] = { 
+                lat: parseFloat(e.latlng.lat.toFixed(6)), 
+                lng: parseFloat(e.latlng.lng.toFixed(6)), 
+                elev: 0 
+            };
+            graphData.edges[nodeId] = []; 
+
+            const marker = L.circleMarker(e.latlng, { radius: 6, color: '#0078FF', fillOpacity: 1 }).addTo(map);
+            marker.bindTooltip(nodeId, { permanent: true, direction: 'right', offset: [5, 0] });
+            marker.on('click', () => handleNodeClick(nodeId, e.latlng));
+        });
+
+        function handleNodeClick(nodeId, latlng) {
+            L.DomEvent.stopPropagation(event); 
+
+            if (currentMode === 'EDGE') {
+                if (!edgeStartNode) {
+                    edgeStartNode = { id: nodeId, latlng: latlng };
+                    document.getElementById('status').innerText = `Connecting ${nodeId} to...`;
+                } else {
+                    if (edgeStartNode.id === nodeId) return; 
+
+                    if (!graphData.edges[edgeStartNode.id].includes(nodeId)) {
+                        graphData.edges[edgeStartNode.id].push(nodeId);
+                        graphData.edges[nodeId].push(edgeStartNode.id);
+                        L.polyline([edgeStartNode.latlng, latlng], { color: 'yellow', weight: 4 }).addTo(map);
+                    }
+                    
+                    edgeStartNode = null;
+                    document.getElementById('status').innerText = 'Click a node to start a trail...';
+                }
+            } 
+            else if (currentMode === 'POI') {
+                const poiName = prompt(`Enter a name for the POI at ${nodeId}:`);
+                if (poiName) {
+                    graphData.locations.push({
+                        name: poiName,
+                        node_id: nodeId,
+                        // NEW: Truncate to 6 decimal places
+                        lat: parseFloat(latlng.lat.toFixed(6)),
+                        lng: parseFloat(latlng.lng.toFixed(6)),
+                        elev: 0,
+                        has_ar: true,
+                        ar_type: "text",
+                        ar_content: poiName
+                    });
+                    
+                    L.circleMarker(latlng, { radius: 10, color: 'red', fillOpacity: 0.5 }).addTo(map);
+                    document.getElementById('status').innerText = `Added POI: ${poiName} at ${nodeId}`;
+                }
+            }
+        }
+
+        document.getElementById('btnExport').onclick = () => {
+            // NEW: Dynamic File Naming
+            let fileNameInput = document.getElementById('fileName').value.trim() || 'custom_park';
+            graphData.id = fileNameInput; // Update the internal ID to match
+            graphData.name = fileNameInput.replace(/_/g, ' ').toUpperCase(); 
+            
+            const finalFileName = fileNameInput.endsWith('.json') ? fileNameInput : fileNameInput + '.json';
+
+            // NEW: Custom Regex Formatter for arrays
+            let rawJson = JSON.stringify(graphData, null, 2);
+            let compactJson = rawJson.replace(/\[\n\s+([^\]]+?)\n\s+\]/g, (match, content) => {
+                if (content.includes('{')) return match; // Leave objects (like locations) alone
+                return '[' + content.replace(/\s*\n\s*/g, ', ') + ']'; // Collapse primitives into a single line
+            });
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(compactJson);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", finalFileName);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        };
+    </script>
+</body>
+</html>

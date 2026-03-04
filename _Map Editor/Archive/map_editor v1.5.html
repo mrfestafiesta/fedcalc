@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Graph Builder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; }
+        #toolbar { padding: 15px; background: #222; color: white; display: flex; gap: 10px; align-items: center; }
+        button { padding: 8px 16px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; }
+        input[type="text"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 150px; }
+        .active-mode { background: #0078FF; color: white; }
+        .inactive-mode { background: #555; color: white; }
+        #btnExport { background: #28a745; margin-left: auto; }
+        #btnExport:disabled { background: #555; cursor: not-allowed; }
+        #status { margin-left: 15px; font-family: monospace; color: #ffcc00; font-size: 14px;}
+        .search-container { position: relative; display: flex; gap: 5px; margin-left: 15px; border-left: 1px solid #555; padding-left: 15px; }
+        #suggestions { position: absolute; top: 100%; left: 15px; background: white; color: black; width: 250px; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 4px; z-index: 1000; display: none; flex-direction: column; }
+        .suggestion-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+        .suggestion-item:hover { background: #0078FF; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button id="btnNode" class="active-mode">1. Drop Nodes</button>
+        <button id="btnEdge" class="inactive-mode">2. Connect Edges</button>
+        <button id="btnPoi" class="inactive-mode">3. Tag POIs</button>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search a park or city..." autocomplete="off">
+            <div id="suggestions"></div>
+        </div>
+
+        <span id="status" style="margin-left: 15px; flex-grow: 1; font-family: monospace; color: #ffcc00; font-size: 14px;">Click map to place a node...</span>
+        
+        <input type="text" id="fileName" value="custom_park" placeholder="Filename (no .json)">
+        <button id="btnExport">⬇️ Export JSON</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        const map = L.map('map').setView([33.9769, -118.4024], 18);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
+
+        let currentMode = 'NODE'; 
+        let nodeCounter = 1;
+        let edgeStartNode = null;
+
+        const graphData = {
+            id: "custom_park",
+            name: "Custom Built Park",
+            nodes: {},
+            edges: {},
+            locations: []
+        };
+
+        // --- NEW: AUTOCOMPLETE SEARCH (PHOTON API) ---
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsBox = document.getElementById('suggestions');
+        let searchTimeout = null;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout); // Reset the timer on every keystroke
+            const query = e.target.value.trim();
+
+            if (query.length < 3) {
+                suggestionsBox.style.display = 'none'; // Wait until they type at least 3 letters
+                return;
+            }
+
+            // The Debounce: Wait 400ms after they stop typing before hitting the API
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+
+                    suggestionsBox.innerHTML = ''; // Clear old suggestions
+
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach(feature => {
+                            const props = feature.properties;
+                            const lat = feature.geometry.coordinates[1];
+                            const lng = feature.geometry.coordinates[0];
+
+                            // Format a clean address string (e.g., "Central Park, New York, NY")
+                            let nameParts = [];
+                            if (props.name) nameParts.push(props.name);
+                            if (props.city || props.town || props.county) nameParts.push(props.city || props.town || props.county);
+                            if (props.state) nameParts.push(props.state);
+                            const displayName = nameParts.join(', ');
+
+                            // Create the dropdown item
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = displayName;
+                            
+                            // Fly to the location when clicked
+                            div.onclick = () => {
+                                map.flyTo([lat, lng], 17);
+                                searchInput.value = displayName;
+                                suggestionsBox.style.display = 'none';
+                                document.getElementById('status').innerText = `Moved to: ${props.name || displayName}`;
+                            };
+
+                            suggestionsBox.appendChild(div);
+                        });
+                        suggestionsBox.style.display = 'flex';
+                    } else {
+                        suggestionsBox.style.display = 'none';
+                    }
+                } catch (err) {
+                    console.log("Autocomplete API failed.");
+                }
+            }, 400); 
+        });
+
+        // Hide suggestions if the user clicks anywhere else on the page
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+
+        const setMode = (mode, statusText) => {
+            currentMode = mode;
+            edgeStartNode = null; 
+            document.querySelectorAll('button').forEach(b => {
+                if(b.id !== 'btnExport') b.classList.replace('active-mode', 'inactive-mode');
+            });
+            document.getElementById(mode === 'NODE' ? 'btnNode' : mode === 'EDGE' ? 'btnEdge' : 'btnPoi').classList.replace('inactive-mode', 'active-mode');
+            document.getElementById('status').innerText = statusText;
+        };
+
+        document.getElementById('btnNode').onclick = () => setMode('NODE', 'Click map to place a node...');
+        document.getElementById('btnEdge').onclick = () => setMode('EDGE', 'Click a node to start a trail...');
+        document.getElementById('btnPoi').onclick = () => setMode('POI', 'Click a node to turn it into a POI...');
+
+        map.on('click', (e) => {
+            if (currentMode !== 'NODE') return;
+            const nodeId = 'n' + nodeCounter++;
+            
+            graphData.nodes[nodeId] = { 
+                lat: parseFloat(e.latlng.lat.toFixed(6)), 
+                lng: parseFloat(e.latlng.lng.toFixed(6)), 
+                elev: 0 // Placeholder, fetched on export
+            };
+            graphData.edges[nodeId] = []; 
+
+            const marker = L.circleMarker(e.latlng, { radius: 6, color: '#0078FF', fillOpacity: 1 }).addTo(map);
+            marker.bindTooltip(nodeId, { permanent: true, direction: 'right', offset: [5, 0] });
+            marker.on('click', () => handleNodeClick(nodeId, e.latlng));
+        });
+
+        function handleNodeClick(nodeId, latlng) {
+            L.DomEvent.stopPropagation(event); 
+
+            if (currentMode === 'EDGE') {
+                if (!edgeStartNode) {
+                    edgeStartNode = { id: nodeId, latlng: latlng };
+                    document.getElementById('status').innerText = `Connecting ${nodeId} to...`;
+                } else {
+                    if (edgeStartNode.id === nodeId) return; 
+
+                    if (!graphData.edges[edgeStartNode.id].includes(nodeId)) {
+                        graphData.edges[edgeStartNode.id].push(nodeId);
+                        graphData.edges[nodeId].push(edgeStartNode.id);
+                        L.polyline([edgeStartNode.latlng, latlng], { color: 'yellow', weight: 4 }).addTo(map);
+                    }
+                    edgeStartNode = null;
+                    document.getElementById('status').innerText = 'Click a node to start a trail...';
+                }
+            } 
+            else if (currentMode === 'POI') {
+                const poiName = prompt(`Enter a name for the POI at ${nodeId}:`);
+                if (poiName) {
+                    graphData.locations.push({
+                        name: poiName,
+                        node_id: nodeId,
+                        lat: parseFloat(latlng.lat.toFixed(6)),
+                        lng: parseFloat(latlng.lng.toFixed(6)),
+                        elev: 0, // Placeholder
+                        has_ar: true,
+                        ar_type: "text",
+                        ar_content: poiName
+                    });
+                    L.circleMarker(latlng, { radius: 10, color: 'red', fillOpacity: 0.5 }).addTo(map);
+                    document.getElementById('status').innerText = `Added POI: ${poiName} at ${nodeId}`;
+                }
+            }
+        }
+
+        // --- NEW: THE ELEVATION ENGINE ---
+        async function fetchTrueElevation(lat, lng) {
+            try {
+                // 1. Try USGS First (Returns meters, converting to feet)
+                const usgsRes = await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lng}&y=${lat}&units=Meters`);
+                const usgsData = await usgsRes.json();
+                if (usgsData && usgsData.value !== undefined && usgsData.value !== "-1000000") {
+                    return parseFloat((usgsData.value * 3.28084).toFixed(2));
+                }
+            } catch (e) {
+                console.log("USGS failed, trying Open-Meteo...");
+            }
+
+            try {
+                // 2. Fallback to Open-Meteo
+                const omRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
+                const omData = await omRes.json();
+                if (omData && omData.elevation && omData.elevation.length > 0) {
+                    return parseFloat((omData.elevation[0] * 3.28084).toFixed(2));
+                }
+            } catch (e) {
+                console.log("Both APIs failed.");
+            }
+            return 0; // Failsafe
+        }
+
+        // Export Functionality (Now Async)
+        document.getElementById('btnExport').onclick = async () => {
+            const btn = document.getElementById('btnExport');
+            const status = document.getElementById('status');
+            btn.disabled = true; // Prevent double-clicking
+            
+            let fileNameInput = document.getElementById('fileName').value.trim() || 'custom_park';
+            graphData.id = fileNameInput; 
+            graphData.name = fileNameInput.replace(/_/g, ' ').toUpperCase(); 
+            const finalFileName = fileNameInput.endsWith('.json') ? fileNameInput : fileNameInput + '.json';
+
+            // --- BATCH FETCH ELEVATIONS ---
+            const nodeIds = Object.keys(graphData.nodes);
+            let count = 1;
+            
+            for (let nodeId of nodeIds) {
+                status.innerText = `Fetching Elevation: Node ${count} of ${nodeIds.length}...`;
+                const node = graphData.nodes[nodeId];
+                
+                node.elev = await fetchTrueElevation(node.lat, node.lng);
+                
+                // Add a polite 200ms delay to prevent IP bans from USGS
+                await new Promise(r => setTimeout(r, 200));
+                count++;
+            }
+
+            // Sync the POI elevations to match their assigned nodes
+            status.innerText = "Syncing POI data...";
+            graphData.locations.forEach(loc => {
+                if (loc.node_id && graphData.nodes[loc.node_id]) {
+                    loc.elev = graphData.nodes[loc.node_id].elev;
+                }
+            });
+
+            status.innerText = "Formatting JSON...";
+
+            let rawJson = JSON.stringify(graphData, null, 2);
+            let compactJson = rawJson
+                .replace(/\[\n\s+([^\]]+?)\n\s+\]/g, (match, content) => {
+                    if (content.includes('{')) return match; 
+                    return '[' + content.replace(/\n\s+/g, ' ') + ']'; 
+                })
+                .replace(/\{\n\s+"lat":\s*([0-9.-]+),\n\s+"lng":\s*([0-9.-]+),\n\s+"elev":\s*([0-9.-]+)\n\s+\}/g, '{"lat": $1, "lng": $2, "elev": $3}');
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(compactJson);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", finalFileName);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+
+            btn.disabled = false;
+            status.innerText = "✅ Export Complete!";
+        };
+    </script>
+</body>
+</html>
