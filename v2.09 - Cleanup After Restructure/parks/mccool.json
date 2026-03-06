@@ -1,0 +1,168 @@
+{
+  "id": "mccool",
+  "name": "MCCOOL",
+  "nodes": {
+    "n1": {
+      "lat": 33.976837,
+      "lng": -118.401965,
+      "elev": 0
+    },
+    "n2": {
+      "lat": 33.976472,
+      "lng": -118.401954,
+      "elev": 0
+    },
+    "n3": {
+      "lat": 33.976165,
+      "lng": -118.401943,
+      "elev": 0
+    },
+    "n4": {
+      "lat": 33.974858,
+      "lng": -118.401273,
+      "elev": 0
+    },
+    "n5": {
+      "lat": 33.975053,
+      "lng": -118.400779,
+      "elev": 0
+    },
+    "n6": {
+      "lat": 33.975707,
+      "lng": -118.400967,
+      "elev": 0
+    },
+    "n7": {
+      "lat": 33.977602,
+      "lng": -118.400972,
+      "elev": 0
+    },
+    "n8": {
+      "lat": 33.978065,
+      "lng": -118.400817,
+      "elev": 0
+    },
+    "n9": {
+      "lat": 33.97839,
+      "lng": -118.400479,
+      "elev": 0
+    },
+    "n10": {
+      "lat": 33.979257,
+      "lng": -118.400881,
+      "elev": 0
+    },
+    "n11": {
+      "lat": 33.978777,
+      "lng": -118.401418,
+      "elev": 0
+    },
+    "n12": {
+      "lat": 33.978314,
+      "lng": -118.401761,
+      "elev": 0
+    },
+    "n13": {
+      "lat": 33.977816,
+      "lng": -118.401922,
+      "elev": 0
+    }
+  },
+  "edges": {
+    "n1": ["n2", "n13"],
+    "n2": ["n1", "n3"],
+    "n3": ["n2", "n4"],
+    "n4": ["n3", "n5"],
+    "n5": ["n4", "n6"],
+    "n6": ["n5", "n7"],
+    "n7": ["n6", "n8"],
+    "n8": ["n7", "n9"],
+    "n9": ["n8", "n10"],
+    "n10": ["n9", "n11"],
+    "n11": ["n10", "n12"],
+    "n12": ["n11", "n13"],
+    "n13": ["n12", "n1"]
+  },
+  "locations": [
+    {
+      "name": "House",
+      "node_id": "n1",
+      "lat": 33.976837,
+      "lng": -118.401965,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "House"
+    },
+    {
+      "name": "intN2",
+      "node_id": "n2",
+      "lat": 33.976472,
+      "lng": -118.401954,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "intN2"
+    },
+    {
+      "name": "intN4",
+      "node_id": "n4",
+      "lat": 33.974858,
+      "lng": -118.401273,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "intN4"
+    },
+    {
+      "name": "n6",
+      "node_id": "n6",
+      "lat": 33.975707,
+      "lng": -118.400967,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "n6"
+    },
+    {
+      "name": "n7",
+      "node_id": "n7",
+      "lat": 33.977602,
+      "lng": -118.400972,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "n7"
+    },
+    {
+      "name": "intN9",
+      "node_id": "n9",
+      "lat": 33.97839,
+      "lng": -118.400479,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "intN9"
+    },
+    {
+      "name": "intN10",
+      "node_id": "n10",
+      "lat": 33.979257,
+      "lng": -118.400881,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "intN10"
+    },
+    {
+      "name": "intN13",
+      "node_id": "n13",
+      "lat": 33.977816,
+      "lng": -118.401922,
+      "elev": 0,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "intN13"
+    }
+  ]
+}

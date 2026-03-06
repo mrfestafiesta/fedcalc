@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Dynamic Tracker: Decoupled AR & Routing</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; }
+        
+        #camera-container { flex: 1; position: relative; overflow: hidden; background: #111; display: none; align-items: center; justify-content: center; color: #555; }
+        #camera-container.active { display: flex; }
+        video { width: 100%; height: 100%; object-fit: cover; display: none; }
+        video.active { display: block; }
+
+        .ar-node { position: absolute; top: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 10; display: none; }
+        
+        .ar-bubble { background: rgba(40, 167, 69, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid white; white-space: nowrap; }
+        .ar-dist { font-size: 14px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #fff; font-weight: bold; }
+        
+        .ar-breadcrumb { width: 15px; height: 15px; background: #0078FF; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0, 120, 255, 0.8); }
+
+        #debug-console { position: absolute; top: 60px; left: 10px; background: rgba(255, 255, 0, 0.8); color: black; padding: 8px; font-size: 11px; z-index: 2000; font-family: monospace; pointer-events: none; border-radius: 4px; display: none; }
+        #map { flex: 1; width: 100%; }
+        #controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+        #data-display { background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
+        .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
+        .pill-btn { background-color: #444; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; width: 160px; transition: background-color 0.2s; }
+        .pill-btn.active { background-color: #28a745; }
+        #btn-route { background-color: #007bff; } 
+        #btn-reset { background: #d9534f; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-top: 5px; align-self: flex-end; }
+        .btn-row { display: flex; gap: 10px; align-items: center;}
+        .small-pill { width: auto; padding: 12px 15px; }
+        #park-selector { padding: 10px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 160px; background: white; border: 2px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); outline: none; }
+        .popup-ar-btn { background-color: #444; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-weight: bold; margin-top: 8px; width: 100%; transition: 0.2s; }
+        .popup-ar-btn.active { background-color: #28a745; }
+        #chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #chart-container { width: 95%; height: 50%; background: white; border-radius: 8px; padding: 10px; }
+        #close-chart { margin-top: 20px; padding: 10px 30px; background: white; border: none; font-weight: bold; border-radius: 50px; cursor: pointer; }
+        #status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
+        #zoom-warning { color: #d9534f; font-size: 13px; font-weight: bold; pointer-events: none; display: none; text-transform: uppercase; letter-spacing: 0.5px; }
+        #btn-settings { position: fixed; bottom: 20px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+        #btn-settings:active { transform: scale(0.9); }
+        #settings-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .settings-content { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: left; color: #333; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        #close-settings { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; color: #888; cursor: pointer; }
+        .storage-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: center; }
+        .grid-header { font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .grid-cell { font-size: 14px; }
+        .name-cell { font-weight: bold; color: #444; }
+        .size-cell { font-family: monospace; color: #666; text-align: right; padding-right: 10px; }
+        .btn-clear-row { background: #d9534f; color: white; border: none; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn-clear-row:active { background: #c9302c; transform: scale(0.95); }
+
+        /* NEW: Federal Lands Legend */
+        .map-legend {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            font-size: 12px;
+            line-height: 18px;
+            color: #333;
+            display: none; /* Hidden by default */
+            z-index: 1000;
+        }
+        .map-legend i {
+            width: 14px;
+            height: 14px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.8;
+            border: 1px solid #999;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status-pill" style="display: none; opacity: 0; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 25px; z-index: 5000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 14px; font-weight: bold; pointer-events: none; transition: opacity 0.3s ease-in-out;">
+        Status Message
+    </div>
+
+    <div id="status">Initializing...</div>
+    <div id="debug-console">Waiting for GPS...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        <div id="data-display">
+            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+            <button id="btn-reset">RESET TRIP</button>
+        </div>
+
+        <select id="park-selector">
+            <option value="">-- Choose Park --</option>
+        </select>
+
+        <div class="btn-row">
+            <button id="btn-route" class="pill-btn">Show Route</button>
+            <button id="btn-wake" class="pill-btn small-pill" title="Keep Screen On">🔒</button>
+        </div>
+
+        <button id="btn-compass" class="pill-btn">Enable Compass</button>
+        <button id="btn-graph" class="pill-btn">Show Elevations</button>
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+        
+        <div class="btn-row">
+            <button id="btn-path" class="pill-btn">GPS Path Off</button>
+            <button id="btn-center" class="pill-btn small-pill" title="Center Map">📍</button>
+            <span id="zoom-warning">Digital Zoom</span>
+        </div>
+    </div>
+
+    <button id="btn-settings" title="Settings">⚙️</button>
+
+    <div id="settings-modal">
+        <div class="settings-content">
+            <span id="close-settings">&times;</span>
+            <h3 style="margin-top: 0; margin-bottom: 20px;">Storage Management</h3>
+            <div class="storage-grid">
+                <div class="grid-header">Data Type</div>
+                <div class="grid-header" style="text-align: right; padding-right: 10px;">Size</div>
+                <div class="grid-header" style="text-align: center;">Action</div>
+
+                <div class="grid-cell name-cell">App Data</div>
+                <div class="grid-cell size-cell" id="size-app">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-app" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">Map Data</div>
+                <div class="grid-cell size-cell" id="size-map">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-map" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">POI Data</div>
+                <div class="grid-cell size-cell" id="size-poi">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-poi" class="btn-clear-row">Clear</button></div>
+                
+                <div class="grid-cell name-cell">Path Data</div>
+                <div class="grid-cell size-cell" id="size-path">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-path" class="btn-clear-row">Clear</button></div>
+            </div>
+            <button id="btn-force-update" style="margin-top: 20px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: 0.2s;">Check for Updates</button>
+        </div>
+    </div>
+
+    <div id="chart-modal">
+        <div id="chart-container"><canvas id="elevationChart"></canvas></div>
+        <button id="close-chart">Close Graph</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="module">
+        import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
+
+        let latestFix = null;       
+        let lastLoggedFix = null;   
+        let deviceHeading = 0;      
+        let fullPathData = [];      
+        let totalDistanceFeet = 0;  
+        let isCameraOn = false;  
+        let isCompassActive = false;   
+        let isPathOn = false;       
+        let currentStream = null;   
+        let myChart = null;         
+        let wakeLockSentinel = null;
+        let isWakeLockRequested = false; 
+        
+        window.SELECTED_POI = null; 
+        
+        let activeParkData = null;  
+        let activeARNodes = []; 
+
+        const MAX_AR_RADIUS_FEET = 300; 
+        const MIN_BREADCRUMB_SPACING = 15;
+        const compassEvent = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation'; 
+
+        const statusDiv = document.getElementById('status');            
+        const debugDiv = document.getElementById('debug-console');      
+        const btnWake = document.getElementById('btn-wake');            
+        const btnCompass = document.getElementById('btn-compass');      
+        const btnCam = document.getElementById('btn-cam');              
+        const btnPath = document.getElementById('btn-path');            
+        const btnCenter = document.getElementById('btn-center');        
+        const btnReset = document.getElementById('btn-reset');          
+        const btnGraph = document.getElementById('btn-graph');          
+        const btnRoute = document.getElementById('btn-route');          
+        const parkSelector = document.getElementById('park-selector');  
+        const videoElement = document.getElementById('video-feed');     
+        const cameraContainer = document.getElementById('camera-container');  
+        const camPlaceholder = document.getElementById('camera-placeholder'); 
+        const distVal = document.getElementById('dist-val');                  
+        const elevVal = document.getElementById('elev-val');                  
+        const chartModal = document.getElementById('chart-modal');            
+        const btnCloseChart = document.getElementById('close-chart');         
+
+        async function loadParkMenu() {
+            try {
+                const response = await fetch('./parks/loc_manifest.json'); 
+                if (!response.ok) throw new Error("Manifest not found");
+                const parkList = await response.json(); 
+                parkList.forEach(park => {
+                    const option = document.createElement('option'); 
+                    option.value = park.id;       
+                    option.textContent = park.name; 
+                    parkSelector.appendChild(option);
+                });
+            } catch (err) {
+                console.error("Failed to load park directory:", err);
+            }
+        }
+        loadParkMenu();
+
+        // 1. Initial Map View (Centered on the USA)
+        const map = L.map('map').setView([39.8283, -98.5795], 4); 
+        
+        // 2. Base Layers
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxNativeZoom: 19, maxZoom: 21 });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri', maxNativeZoom: 19, maxZoom: 21 });
+
+        // 3. Official BLM Surface Management Agency (SMA) Layer
+        // This cached tile server natively shows ALL federal lands without using clunky WMS endpoints.
+        const federalLandsLayer = L.tileLayer('https://gis.blm.gov/arcgis/rest/services/lands/BLM_Natl_SMA_Cached_without_PriUnk/MapServer/tile/{z}/{y}/{x}', {
+            opacity: 0.4,
+            maxNativeZoom: 14, // The government caches tiles down to zoom level 14
+            maxZoom: 21,       // Leaflet will smoothly stretch the tiles when you zoom in closer
+            attribution: 'Federal Lands © BLM SMA'
+        });
+
+        osmLayer.addTo(map);
+
+        // 4. Layer Controls
+        const baseMaps = { "Street Map": osmLayer, "Satellite": satelliteLayer };
+        const overlayMaps = { "U.S. Federal Lands": federalLandsLayer };
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        // 5. Create the Custom Legend UI (Fully Expanded)
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'map-legend');
+            div.innerHTML += '<strong style="font-size:13px; display:block; margin-bottom:4px;">Surface Management</strong>';
+            div.innerHTML += '<i style="background: #FFE57F"></i> BLM<br>';
+            div.innerHTML += '<i style="background: #C1E6B3"></i> Forest Service<br>';
+            div.innerHTML += '<i style="background: #D9C2E6"></i> National Park<br>';
+            div.innerHTML += '<i style="background: #FFC299"></i> Fish & Wildlife<br>';
+            div.innerHTML += '<i style="background: #B2E3FF"></i> State Lands<br>';
+            div.innerHTML += '<i style="background: #FFB3C6"></i> Dept. of Defense<br>';
+            div.innerHTML += '<i style="background: #FFD3A6"></i> Tribal (BIA)<br>';
+            return div;
+        };
+        legend.addTo(map);
+
+        // 6. Tie Legend Visibility to the Layer Toggle
+        map.on('overlayadd', function(eventLayer) {
+            if (eventLayer.name === "U.S. Federal Lands") {
+                document.querySelector('.map-legend').style.display = 'block';
+            }
+        });
+        map.on('overlayremove', function(eventLayer) {
+            if (eventLayer.name === "U.S. Federal Lands") {
+                document.querySelector('.map-legend').style.display = 'none';
+            }
+        });
+
+        const zoomWarning = document.getElementById('zoom-warning'); 
+        map.on('zoomend', () => { zoomWarning.style.display = map.getZoom() > 19 ? 'block' : 'none'; });
+        
+        const userMarker = L.marker([0, 0]).addTo(map); 
+        const pathLine = L.polyline([], {color: 'red', weight: 4}).addTo(map); 
+        const routeLayer = L.featureGroup().addTo(map);
+        const dotLayer = L.layerGroup().addTo(map); 
+        const dynamicPoiLayer = L.layerGroup().addTo(map); 
+        const trailPathLayer = L.layerGroup().addTo(map); 
+
+        parkSelector.addEventListener('change', async (e) => {
+            const selectedPark = e.target.value; 
+            
+            if (!selectedPark) {
+                dynamicPoiLayer.clearLayers();
+                trailPathLayer.clearLayers();
+                routeLayer.clearLayers();
+                window.SELECTED_POI = null;
+                activeParkData = null;
+                clearARWorld();
+                return;
+            }
+
+            try {
+                const response = await fetch(`./parks/${selectedPark}.json`); 
+                if (!response.ok) throw new Error("File not found");
+                
+                const data = await response.json(); 
+                
+                activeParkData = data; 
+                
+                dynamicPoiLayer.clearLayers();
+                trailPathLayer.clearLayers();
+                const bounds = []; 
+
+                if (data.nodes && data.edges) {
+                    const drawnEdges = new Set(); 
+
+                    for (const [startNodeId, connectedNodes] of Object.entries(data.edges)) {
+                        const startNode = data.nodes[startNodeId];
+                        bounds.push([startNode.lat, startNode.lng]);
+
+                        for (const [endNodeId, edgeType] of Object.entries(connectedNodes)) {
+                            const endNode = data.nodes[endNodeId];
+                            const edgeId = [startNodeId, endNodeId].sort().join('-');
+                            
+                            if (!drawnEdges.has(edgeId)) {
+                                drawnEdges.add(edgeId);
+                                
+                                // FIX: Draw the base map paths in a faint blue so they don't clutter the screen
+                                L.polyline([
+                                    [startNode.lat, startNode.lng], 
+                                    [endNode.lat, endNode.lng]
+                                ], { color: '#0078FF', weight: 3, opacity: 0.3 }).addTo(trailPathLayer);
+                            }
+                        }
+                    }
+                }
+
+                data.locations.forEach(poi => {
+                    bounds.push([poi.lat, poi.lng]);
+                    const marker = L.marker([poi.lat, poi.lng]).bindPopup(`<b>${poi.name}</b><br>Click to load data...`); 
+                    
+                    // FIX: Removed the permanent node_id tooltip that was hovering above the POIs
+
+                    marker.on('click', async () => {
+                        window.SELECTED_POI = { lat: poi.lat, lng: poi.lng, name: poi.name, node_id: poi.node_id };
+                        marker.setPopupContent(`<b>${poi.name}</b><br>⏳ Fetching weather...`);
+                        
+                        try {
+                            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${poi.lat}&longitude=${poi.lng}&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`;
+                            const wRes = await fetch(weatherUrl);
+                            const wData = await wRes.json(); 
+                            
+                            let temp = "--", wind = "--", finalElev = "--", elevSource = "OM"; 
+                            if (wData && wData.current_weather) {
+                                temp = wData.current_weather.temperature;
+                                wind = wData.current_weather.windspeed;
+                                finalElev = (wData.elevation * 3.28084).toFixed(0); 
+                            }
+                            marker.setPopupContent(`<b>${poi.name}</b><br>🌡️ Temp: ${temp}°F<br>💨 Wind: ${wind} mph<br>⛰️ Elev: ${finalElev} ft (${elevSource})`); 
+                            
+                            const usgsUrl = `https://epqs.nationalmap.gov/v1/json?x=${poi.lng}&y=${poi.lat}&units=Feet&wkid=4326`; 
+                            fetch(usgsUrl).then(async (eRes) => {
+                                const contentType = eRes.headers.get("content-type");
+                                if (eRes.ok && contentType && contentType.includes("application/json")) {
+                                    const eData = await eRes.json();
+                                    if (eData && eData.value !== undefined && eData.value !== "-1000000") {
+                                        finalElev = parseFloat(eData.value).toFixed(0);
+                                        marker.setPopupContent(`<b>${poi.name}</b><br>🌡️ Temp: ${temp}°F<br>💨 Wind: ${wind} mph<br>⛰️ Elev: ${finalElev} ft (USGS)`); 
+                                    }
+                                }
+                            }).catch(err => {});
+                        } catch (err) { marker.setPopupContent(`<b>${poi.name}</b><br>⚠️ Weather unavailable`); }
+                    });
+                    
+                    dynamicPoiLayer.addLayer(marker);
+                });
+
+                if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] }); 
+                
+                if (isCameraOn && latestFix) buildARWorld();
+
+            } catch (error) {
+                console.error("Error loading park data:", error);
+                alert("Could not load data for that location.");
+            }
+        });
+
+
+        function clearARWorld() {
+            document.querySelectorAll('.ar-node').forEach(node => node.remove());
+            activeARNodes = [];
+        }
+
+        function buildARWorld() {
+            if (!activeParkData || !latestFix || !isCameraOn) return;
+            clearARWorld();
+
+            const userLoc = { lat: latestFix.lat, lng: latestFix.lng };
+
+            let lastBreadcrumb = null;
+            if (activeParkData.trail_path) {
+                activeParkData.trail_path.forEach(coord => {
+                    const pt = { lat: coord[0], lng: coord[1], elev: coord[2] };
+                    const distToUser = map.distance([userLoc.lat, userLoc.lng], [pt.lat, pt.lng]) * 3.28084;
+
+                    if (distToUser <= MAX_AR_RADIUS_FEET) {
+                        if (!lastBreadcrumb || (map.distance([lastBreadcrumb.lat, lastBreadcrumb.lng], [pt.lat, pt.lng]) * 3.28084) >= MIN_BREADCRUMB_SPACING) {
+                            spawnARNode(pt, 'breadcrumb', '');
+                            lastBreadcrumb = pt;
+                        }
+                    }
+                });
+            }
+
+            if (activeParkData.locations) {
+                activeParkData.locations.forEach(poi => {
+                    const distToUser = map.distance([userLoc.lat, userLoc.lng], [poi.lat, poi.lng]) * 3.28084;
+                    if (poi.has_ar && distToUser <= MAX_AR_RADIUS_FEET) {
+                        spawnARNode(poi, poi.ar_type || 'text', poi.name);
+                    }
+                });
+            }
+            
+            updateARPositions(); 
+        }
+
+        function spawnARNode(targetData, type, content) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'ar-node';
+            
+            if (type === 'breadcrumb') {
+                nodeDiv.innerHTML = `<div class="ar-breadcrumb"></div>`;
+            } else {
+                nodeDiv.innerHTML = `
+                    <div class="ar-bubble">${content}</div>
+                    <div class="ar-dist dist-label">-- ft</div>
+                `;
+            }
+
+            cameraContainer.appendChild(nodeDiv);
+            
+            activeARNodes.push({
+                lat: targetData.lat,
+                lng: targetData.lng,
+                element: nodeDiv,
+                isPOI: type !== 'breadcrumb'
+            });
+        }
+
+        function updateARPositions() {
+            if (!isCameraOn || !latestFix || activeARNodes.length === 0) return;
+            
+            const userLoc = L.latLng(latestFix.lat, latestFix.lng);
+            
+            activeARNodes.forEach(node => {
+                const targetLoc = L.latLng(node.lat, node.lng);
+                const distFeet = userLoc.distanceTo(targetLoc) * 3.28084;
+                
+                const y = Math.sin(targetLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180) * Math.cos(targetLoc.lat * Math.PI/180);
+                const x = Math.cos(userLoc.lat * Math.PI/180) * Math.sin(targetLoc.lat * Math.PI/180) - Math.sin(userLoc.lat * Math.PI/180) * Math.cos(targetLoc.lat * Math.PI/180) * Math.cos(targetLoc.lng * Math.PI/180 - userLoc.lng * Math.PI/180);
+                
+                let bearing = Math.atan2(y, x) * 180 / Math.PI;
+                bearing = (bearing + 360) % 360; 
+
+                let diff = bearing - deviceHeading; 
+                while (diff < -180) diff += 360; 
+                while (diff > 180) diff -= 360; 
+
+                if (Math.abs(diff) < 35) {
+                    node.element.style.display = 'block';
+                    let screenPercent = 50 + (diff * 1.5); 
+                    node.element.style.left = screenPercent + "%";
+                    node.element.style.opacity = Math.abs(diff) > 40 ? "0.4" : "1.0";
+                    
+                    if (node.isPOI) {
+                        node.element.querySelector('.dist-label').innerText = `${distFeet.toFixed(0)} ft`;
+                    }
+                } else {
+                    node.element.style.display = 'none'; 
+                }
+            });
+        }
+
+        btnCam.addEventListener('click', async () => {
+            if (!isCameraOn) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    videoElement.srcObject = currentStream;
+                    videoElement.classList.add('active');
+                    camPlaceholder.style.display = 'none';
+                    cameraContainer.classList.add('active'); 
+                    isCameraOn = true;
+                    btnCam.textContent = "Camera On";
+                    btnCam.classList.add('active');
+                    setTimeout(() => map.invalidateSize(), 100); 
+                    
+                    buildARWorld();
+                } catch (err) { alert("Camera failed."); }
+            } else {
+                if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+                videoElement.srcObject = null;
+                videoElement.classList.remove('active');
+                camPlaceholder.style.display = 'block';
+                cameraContainer.classList.remove('active'); 
+                isCameraOn = false;
+                btnCam.textContent = "Camera Off";
+                btnCam.classList.remove('active');
+                
+                clearARWorld();
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        });
+
+        btnCompass.addEventListener('click', async () => {
+            if (!isCompassActive) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const r = await DeviceOrientationEvent.requestPermission();
+                        if (r === 'granted') {
+                            window.addEventListener(compassEvent, handleOrientation);
+                            toggleCompassUI(true);
+                        } else alert("Compass access denied.");
+                    } catch (err) { console.error(err); }
+                } else {
+                    window.addEventListener(compassEvent, handleOrientation);
+                    toggleCompassUI(true);
+                }
+            } else {
+                window.removeEventListener(compassEvent, handleOrientation);
+                toggleCompassUI(false);
+            }
+        });
+
+        function toggleCompassUI(turningOn) {
+            isCompassActive = turningOn;
+            if (turningOn) {
+                btnCompass.innerText = "Disable Compass";
+                btnCompass.classList.add('active'); 
+                debugDiv.style.display = 'block';   
+            } else {
+                btnCompass.innerText = "Enable Compass";
+                btnCompass.classList.remove('active'); 
+                debugDiv.style.display = 'none';       
+            }
+        }
+
+       function handleOrientation(e) {
+            let heading = 0; 
+            
+            if (e.webkitCompassHeading) {
+                heading = e.webkitCompassHeading;
+           } else if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
+                const degToRad = Math.PI / 180;
+                const alpha = e.alpha * degToRad;
+                const beta = e.beta * degToRad;
+                const gamma = e.gamma * degToRad;
+
+                const cA = Math.cos(alpha), sA = Math.sin(alpha);
+                const cB = Math.cos(beta),  sB = Math.sin(beta);
+                const cG = Math.cos(gamma), sG = Math.sin(gamma);
+
+                const x_w = -cA * sG - sA * sB * cG;
+                const y_w = -sA * sG + cA * sB * cG;
+
+                let compassHeading = Math.atan2(x_w, y_w) * (180 / Math.PI);
+
+                if (compassHeading < 0) compassHeading += 360;
+                
+                heading = compassHeading;
+            }
+            
+            deviceHeading = heading;
+            
+            debugDiv.innerHTML = `DEBUG<br>Hdg: ${deviceHeading.toFixed(0)}°<br>Nodes: ${activeARNodes.length}`;
+            
+            updateARPositions(); 
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    latestFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    userMarker.setLatLng([latestFix.lat, latestFix.lng]);
+                    const altFeet = (latestFix.alt * 3.28084).toFixed(0); 
+                    statusDiv.innerText = `GPS Active\nAcc: ${latestFix.acc.toFixed(0)}m`;
+                    elevVal.innerText = `${altFeet} ft`;
+                },
+                (err) => statusDiv.innerText = "Waiting for GPS...", 
+                { enableHighAccuracy: true, maximumAge: 0 } 
+            );
+        }
+
+        function getClosestNode(lat, lng, graphData) {
+            let closestNode = null;
+            let minDist = Infinity;
+            for (let nodeId in graphData.nodes) {
+                const node = graphData.nodes[nodeId];
+                const d = map.distance([lat, lng], [node.lat, node.lng]);
+                if (d < minDist) {
+                    minDist = d;
+                    closestNode = nodeId;
+                }
+            }
+            return closestNode;
+        }
+
+        function findShortestPath(startNodeId, endNodeId, graphData) {
+            const distances = {};
+            const previous = {};
+            const unvisited = new Set(Object.keys(graphData.nodes));
+
+            for (let node in graphData.nodes) {
+                distances[node] = Infinity;
+                previous[node] = null;
+            }
+            distances[startNodeId] = 0; 
+
+            while (unvisited.size > 0) {
+                let currNode = null;
+                let minVal = Infinity;
+                for (let node of unvisited) {
+                    if (distances[node] < minVal) {
+                        minVal = distances[node];
+                        currNode = node;
+                    }
+                }
+
+                if (currNode === null || currNode === endNodeId) break; 
+                unvisited.delete(currNode);
+
+                const neighbors = graphData.edges[currNode] || {};
+                for (let neighbor in neighbors) {
+                    if (unvisited.has(neighbor)) {
+                        const pt1 = graphData.nodes[currNode];
+                        const pt2 = graphData.nodes[neighbor];
+                        const edgeType = neighbors[neighbor]; 
+                        
+                        const flatDistFeet = map.distance([pt1.lat, pt1.lng], [pt2.lat, pt2.lng]) * 3.28084;
+                        const altDiff = (pt2.elev || 0) - (pt1.elev || 0);
+                        let weight = Math.sqrt(Math.pow(flatDistFeet, 2) + Math.pow(altDiff, 2)); 
+
+                        if (edgeType === 'drive') weight *= 0.1; // Discount driving cost
+
+                        const altDistance = distances[currNode] + weight;
+                        if (altDistance < distances[neighbor]) {
+                            distances[neighbor] = altDistance;
+                            previous[neighbor] = currNode;
+                        }
+                    }
+                }
+            }
+
+            if (distances[endNodeId] === Infinity) return { path: null, cost: Infinity };
+
+            const path = [];
+            let current = endNodeId;
+            while (current !== null) {
+                path.unshift(current);
+                if (current === startNodeId) break;
+                current = previous[current];
+            }
+
+            // FIX: Now returns both the path array AND the total calculated weight
+            return path.length > 1 && path[0] === startNodeId ? { path: path, cost: distances[endNodeId] } : { path: null, cost: Infinity };
+        }
+
+        btnRoute.addEventListener('click', async () => {
+            if (!latestFix) return alert("Waiting for GPS...");
+            if (!window.SELECTED_POI) return alert("Please click a map pin to select a destination first!");
+            if (!activeParkData || !activeParkData.nodes) return alert("Offline routing graph not available for this location.");
+
+            btnRoute.innerText = "Calculating...";
+            routeLayer.clearLayers();
+
+            try {
+                const endNodeId = window.SELECTED_POI.node_id;
+                const closestNodeId = getClosestNode(latestFix.lat, latestFix.lng, activeParkData);
+                const distToParkFeet = map.distance([latestFix.lat, latestFix.lng], [activeParkData.nodes[closestNodeId].lat, activeParkData.nodes[closestNodeId].lng]) * 3.28084;
+
+                let startNodeId = closestNodeId;
+                let needsDrivingRoute = false;
+
+                if (distToParkFeet > 1000) {
+                    needsDrivingRoute = true;
+                    let validEntrances = [];
+
+                    for (let nodeId in activeParkData.nodes) {
+                        const node = activeParkData.nodes[nodeId];
+                        const edges = activeParkData.edges[nodeId] || {};
+                        
+                        let driveEdgeCount = 0;
+                        for (let target in edges) if (edges[target] === 'drive') driveEdgeCount++;
+
+                        if (node.type === 'trailhead' && driveEdgeCount === 0) {
+                            validEntrances.push(nodeId); 
+                        } else if (node.type === 'offroad' && Object.keys(edges).length === 1) {
+                            validEntrances.push(nodeId); 
+                        }
+                    }
+
+                    if (validEntrances.length === 0) {
+                        for (let nodeId in activeParkData.nodes) {
+                             if (activeParkData.nodes[nodeId].type === 'offroad' || activeParkData.nodes[nodeId].type === 'trailhead') validEntrances.push(nodeId);
+                        }
+                    }
+
+                    let bestEntrance = null;
+                    let lowestWalkCost = Infinity;
+
+                    for (let nodeId of validEntrances) {
+                        const resultObj = findShortestPath(nodeId, endNodeId, activeParkData);
+                        
+                        // FIX: We must check the .path property inside the returned object!
+                        if (resultObj && resultObj.path) {
+                            const resultPath = resultObj.path;
+                            let walkCost = 0;
+                            // Now we can safely check the length of the array
+                            for(let i=0; i<resultPath.length-1; i++) {
+                                if (activeParkData.edges[resultPath[i]][resultPath[i+1]] === 'walk') walkCost++;
+                            }
+                            if (walkCost < lowestWalkCost) {
+                                lowestWalkCost = walkCost;
+                                bestEntrance = nodeId;
+                            }
+                        }
+                    }
+
+                    if (!bestEntrance) throw new Error("Could not find a valid entrance.");
+                    startNodeId = bestEntrance;
+                }
+
+                // --- PHASE 1: Draw the Custom Park Route (Brown & Yellow Lines) ---
+                const routeResult = findShortestPath(startNodeId, endNodeId, activeParkData);
+                
+                // FIX: Extract the actual array from the object so the loop can read its length!
+                const pathNodes = routeResult ? routeResult.path : null;
+
+                if (pathNodes) {
+                    for (let i = 0; i < pathNodes.length - 1; i++) {
+                        const n1 = pathNodes[i];
+                        const n2 = pathNodes[i+1];
+                        const pt1 = activeParkData.nodes[n1];
+                        const pt2 = activeParkData.nodes[n2];
+                        const edgeType = activeParkData.edges[n1][n2]; 
+                        
+                        const color = edgeType === 'drive' ? '#8B4513' : '#FFD700'; 
+                        const dash = edgeType === 'walk' ? '10, 10' : '';
+                        
+                        L.polyline([[pt1.lat, pt1.lng], [pt2.lat, pt2.lng]], {
+                            color: color, weight: 7, opacity: 1.0, dashArray: dash
+                        }).addTo(routeLayer);
+                    }
+                } else {
+                    throw new Error("Could not find a connected trail.");
+                }
+
+                // --- PHASE 2: Draw the Global Driving Route (Blue Line) ---
+                if (needsDrivingRoute) {
+                    const targetNode = activeParkData.nodes[startNodeId];
+                    try {
+                        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${latestFix.lng},${latestFix.lat};${targetNode.lng},${targetNode.lat}?geometries=geojson`;
+                        const res = await fetch(osrmUrl);
+                        if (!res.ok) throw new Error("OSRM API returned " + res.status);
+                        const data = await res.json();
+                        
+                        if (data.routes && data.routes.length > 0) {
+                            const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                            L.polyline(coords, { color: '#0078FF', weight: 6, opacity: 0.8 }).addTo(routeLayer);
+                        } else throw new Error("No route found");
+                    } catch (e) {
+                        console.warn("OSRM Failed:", e);
+                        L.polyline([[latestFix.lat, latestFix.lng], [targetNode.lat, targetNode.lng]], { color: '#0078FF', weight: 4, dashArray: '5, 10' }).addTo(routeLayer);
+                    }
+                }
+
+                if (routeLayer.getLayers().length > 0) {
+                    map.fitBounds(routeLayer.getBounds(), {padding: [50, 50]});
+                }
+                
+                btnRoute.innerText = "Update Route";
+                
+            } catch (err) {
+                console.error("Routing error:", err);
+                alert(err.message || "An error occurred while calculating the route.");
+                btnRoute.innerText = "Show Route";
+            }
+        });
+
+        async function requestWakeLock() {
+            try {
+                wakeLockSentinel = await navigator.wakeLock.request('screen');
+                btnWake.classList.add('active');
+                btnWake.innerText = "🔓";
+                wakeLockSentinel.addEventListener('release', () => {
+                    if (!isWakeLockRequested) {
+                        btnWake.classList.remove('active');
+                        btnWake.innerText = "🔒";
+                    }
+                });
+            } catch (err) {
+                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+                alert("Screen Wake Lock is not supported on this browser.");
+                isWakeLockRequested = false;
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        }
+
+        btnWake.addEventListener('click', async () => {
+            if (!isWakeLockRequested) {
+                isWakeLockRequested = true;
+                await requestWakeLock();
+            } else {
+                isWakeLockRequested = false;
+                if (wakeLockSentinel) {
+                    await wakeLockSentinel.release();
+                    wakeLockSentinel = null;
+                }
+                btnWake.classList.remove('active');
+                btnWake.innerText = "🔒";
+            }
+        });
+
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && isWakeLockRequested) {
+                await requestWakeLock();
+            }
+        });
+
+        btnPath.addEventListener('click', () => {
+            isPathOn = !isPathOn;
+            if (isPathOn) {
+                btnPath.textContent = "Recording...";
+                btnPath.classList.add('active');
+                if (!lastLoggedFix && latestFix) lastLoggedFix = latestFix;
+            } else {
+                btnPath.textContent = "GPS Path Off";
+                btnPath.classList.remove('active');
+            }
+        });
+
+        btnCenter.addEventListener('click', () => {
+            if (latestFix) map.setView([latestFix.lat, latestFix.lng], 18); 
+            else alert("Waiting for GPS signal...");
+        });
+
+        btnReset.addEventListener('click', async () => {
+            if(!confirm("Reset trip?")) return;
+            fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); dotLayer.clearLayers();
+            distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+            routeLayer.clearLayers(); 
+            await del('my-hike-data'); 
+        });
+
+        btnGraph.addEventListener('click', () => {
+             if (fullPathData.length < 2) { alert("Not enough data."); return; } 
+             const labels = [], dataPoints = []; 
+             let accumDist = 0; 
+             for (let i = 0; i < fullPathData.length; i++) {
+                const point = fullPathData[i]; 
+                if (i > 0) {
+                    const prev = fullPathData[i-1]; 
+                    accumDist += (map.distance([prev[0], prev[1]], [point[0], point[1]]) * 3.28084); 
+                }
+                labels.push(accumDist.toFixed(0)); 
+                dataPoints.push((point[2] * 3.28084)); 
+             }
+             const ctx = document.getElementById('elevationChart').getContext('2d'); 
+             if (myChart) myChart.destroy(); 
+             myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Elevation (ft)', data: dataPoints, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Distance (ft)' } }, y: { title: { display: true, text: 'Altitude (ft)' } } } }
+             });
+             chartModal.style.display = 'flex'; 
+        });
+
+        btnCloseChart.addEventListener('click', () => { 
+            chartModal.style.display = 'none'; 
+        });
+
+        setInterval(async () => {
+            if (latestFix && isPathOn) {
+                if (lastLoggedFix) {
+                    const from = L.latLng(lastLoggedFix.lat, lastLoggedFix.lng); 
+                    const to = L.latLng(latestFix.lat, latestFix.lng); 
+                    const distFeet = from.distanceTo(to) * 3.28084; 
+                    if (distFeet > 3) {
+                        totalDistanceFeet += distFeet;
+                        distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+                    }
+                }
+                fullPathData.push([latestFix.lat, latestFix.lng, latestFix.alt, Date.now()]); 
+                await set('my-hike-data', fullPathData); 
+                L.circleMarker([latestFix.lat, latestFix.lng], {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer); 
+                pathLine.setLatLngs(fullPathData.map(p => [p[0], p[1]])); 
+                lastLoggedFix = latestFix; 
+            }
+        }, 5000);
+
+        async function loadSavedTrip() {
+            try {
+                const savedPath = await get('my-hike-data'); 
+                if (savedPath && savedPath.length > 0) {
+                    fullPathData = savedPath;
+                    const latLngs = fullPathData.map(p => [p[0], p[1]]); 
+                    pathLine.setLatLngs(latLngs);
+                    latLngs.forEach(pt => L.circleMarker(pt, {radius: 4, color: 'orange', fillColor: '#f03', fillOpacity: 0.8}).addTo(dotLayer));
+                    
+                    let restoredDist = 0; 
+                    for(let i=1; i<latLngs.length; i++) {
+                        restoredDist += map.distance(latLngs[i-1], latLngs[i]);
+                    }
+                    totalDistanceFeet = restoredDist * 3.28084;
+                    distVal.innerText = `${totalDistanceFeet.toFixed(1)} ft`;
+
+                    const lastPoint = fullPathData[fullPathData.length - 1]; 
+                    lastLoggedFix = { lat: lastPoint[0], lng: lastPoint[1] };
+                    map.setView([lastPoint[0], lastPoint[1]], 16);
+                }
+            } catch (err) { console.error(err); }
+        }
+        loadSavedTrip();
+
+        const CACHES = { app: `tracker-shell-v1`, map: `map-tiles`, poi: `tracker-data-v1` };
+        const btnSettings = document.getElementById('btn-settings');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettings = document.getElementById('close-settings');
+        const sizeApp = document.getElementById('size-app');
+        const sizeMap = document.getElementById('size-map');
+        const sizePoi = document.getElementById('size-poi');
+        const sizePath = document.getElementById('size-path');
+
+        async function getCacheSizeMB(cacheName, isTiles = false) {
+            if (!('caches' in window)) return "0.00"; 
+            try {
+                const hasCache = await caches.has(cacheName); 
+                if (!hasCache) return "0.00";
+                const cache = await caches.open(cacheName); 
+                const requests = await cache.keys(); 
+                if (isTiles) {
+                    const totalBytes = requests.length * 25 * 1024; 
+                    return (totalBytes / (1024 * 1024)).toFixed(2); 
+                } else {
+                    let totalBytes = 0; 
+                    for (let req of requests) {
+                        const res = await cache.match(req); 
+                        if (res) {
+                            const blob = await res.blob();
+                            totalBytes += blob.size;
+                        }
+                    }
+                    return (totalBytes / (1024 * 1024)).toFixed(2); 
+                }
+            } catch (e) { return "0.00"; }
+        }
+
+        async function getPathSizeMB() {
+            try {
+                const data = await get('my-hike-data'); 
+                if (!data || data.length === 0) return "0.00"; 
+                const jsonString = JSON.stringify(data); 
+                const bytes = new Blob([jsonString]).size; 
+                return (bytes / (1024 * 1024)).toFixed(2); 
+            } catch (e) { return "0.00"; }
+        }
+
+        async function refreshStorageNumbers() {
+            sizeApp.innerText = "Calc..."; sizeMap.innerText = "Calc...";
+            sizePoi.innerText = "Calc..."; sizePath.innerText = "Calc...";
+            sizeApp.innerText = `${await getCacheSizeMB(CACHES.app)} MB`;
+            sizeMap.innerText = `${await getCacheSizeMB(CACHES.map, true)} MB`;
+            sizePoi.innerText = `${await getCacheSizeMB(CACHES.poi)} MB`;
+            sizePath.innerText = `${await getPathSizeMB()} MB`;
+        }
+
+        btnSettings.addEventListener('click', () => { settingsModal.style.display = 'flex'; refreshStorageNumbers(); });
+        closeSettings.addEventListener('click', () => { settingsModal.style.display = 'none'; });
+        window.addEventListener('click', (event) => { if (event.target === settingsModal) settingsModal.style.display = 'none'; });
+
+        document.getElementById('btn-clear-app').addEventListener('click', async () => {
+            if(confirm("Clear core app data? It will automatically redownload.")) {
+                await caches.delete(CACHES.app); sizeApp.innerText = "0.00 MB";
+            }
+        });
+        document.getElementById('btn-clear-map').addEventListener('click', async () => {
+            if(confirm("Clear offline map tiles?")) {
+                await caches.delete(CACHES.map); sizeMap.innerText = "0.00 MB";
+            }
+        });
+        document.getElementById('btn-clear-poi').addEventListener('click', async () => {
+            if(confirm("Clear downloaded park POIs?")) {
+                await caches.delete(CACHES.poi); sizePoi.innerText = "0.00 MB";
+            }
+        });
+        document.getElementById('btn-clear-path').addEventListener('click', async () => {
+            if(confirm("Delete your current recorded GPS path? This cannot be undone.")) {
+                await del('my-hike-data');
+                fullPathData = []; totalDistanceFeet = 0; pathLine.setLatLngs([]); 
+                dotLayer.clearLayers(); distVal.innerText = "0.0 ft"; lastLoggedFix = null;
+                sizePath.innerText = "0.0000 MB";
+            }
+        });
+
+        function showStatusPill(message, bgColor = '#333') {
+            const pill = document.getElementById('status-pill');
+            pill.innerText = message;
+            pill.style.background = bgColor;
+            pill.style.display = 'block';
+            setTimeout(() => pill.style.opacity = '1', 10);
+            setTimeout(() => {
+                pill.style.opacity = '0';
+                setTimeout(() => pill.style.display = 'none', 300);
+            }, 3000);
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => console.log('Vault Service Worker Registered!'))
+                    .catch(err => console.error('SW Registration Failed!', err));
+                if (sessionStorage.getItem('appJustUpdated') === 'true') {
+                    sessionStorage.removeItem('appJustUpdated');
+                    showStatusPill('App Update Complete ✅', '#28a745');
+                }
+            });
+        }
+
+        document.getElementById('btn-force-update').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-force-update');
+            const originalText = btn.innerText;
+            btn.innerText = "Checking...";
+            try {
+                const shellCache = await caches.open('tracker-shell-v1');
+                const dataCache = await caches.open('tracker-data-v1');
+                let updatesFound = false;
+
+                const liveHtmlRes = await fetch('./index.html', { cache: 'no-store' });
+                const liveHtmlText = await liveHtmlRes.clone().text();
+                const cachedHtml = await shellCache.match('./index.html');
+                const cachedHtmlText = cachedHtml ? await cachedHtml.text() : '';
+
+                if (cachedHtmlText === '') {
+                    await shellCache.put('./index.html', liveHtmlRes.clone());
+                } else if (liveHtmlText !== cachedHtmlText) {
+                    await shellCache.put('./index.html', liveHtmlRes.clone());
+                    updatesFound = true;
+                }
+                
+                const liveManifestRes = await fetch('./parks/loc_manifest.json', { cache: 'no-store' });
+                const liveManifestText = await liveManifestRes.clone().text();
+                const cachedManifest = await dataCache.match('./parks/loc_manifest.json');
+                const cachedManifestText = cachedManifest ? await cachedManifest.text() : '';
+
+                if (cachedManifestText === '') {
+                    await dataCache.put('./parks/loc_manifest.json', liveManifestRes.clone());
+                } else if (liveManifestText !== cachedManifestText) {
+                    await dataCache.put('./parks/loc_manifest.json', liveManifestRes.clone());
+                    updatesFound = true;
+                }
+
+                const manifestData = await liveManifestRes.json(); 
+                
+                for (const park of manifestData) {
+                    const parkUrl = `./parks/${park.id}.json`;
+                    try {
+                        const liveParkRes = await fetch(parkUrl, { cache: 'no-store' });
+                        const liveParkText = await liveParkRes.clone().text();
+                        const cachedPark = await dataCache.match(parkUrl);
+                        const cachedParkText = cachedPark ? await cachedPark.text() : '';
+
+                        if (cachedParkText === '') {
+                            await dataCache.put(parkUrl, liveParkRes.clone());
+                        } else if (liveParkText !== cachedParkText) {
+                            await dataCache.put(parkUrl, liveParkRes.clone());
+                            updatesFound = true;
+                        }
+                    } catch (err) {
+                        console.log(`Skipping missing park file: ${parkUrl}`);
+                    }
+                }
+
+                if (updatesFound) {
+                    sessionStorage.setItem('appJustUpdated', 'true');
+                    window.location.reload();
+                } else {
+                    btn.innerText = originalText;
+                    showStatusPill('No Update Available', '#6c757d');
+                }
+            } catch (err) {
+                console.error(err);
+                btn.innerText = originalText;
+                showStatusPill('Check Failed (Offline?)', '#dc3545');
+            }
+        });
+
+    </script>
+</body>
+</html>
