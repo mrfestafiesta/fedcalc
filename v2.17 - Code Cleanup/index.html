@@ -75,16 +75,15 @@
         .legend-color { width: 16px; height: 4px; border-radius: 2px; }
 
         /* === SYSTEM: SEARCH BAR === */
-        #search-container {
-            display: none;
+     #search-container {
+            display: none !important; /* Hides it */
             position: absolute;
-            top: 20px;
+            top: 60px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 2500; /* Above map and AR camera */
+            z-index: 2500;
             width: 90%;
             max-width: 350px;
-            display: flex;
             flex-direction: column;
         }
         #search-input {
