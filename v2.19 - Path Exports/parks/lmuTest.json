@@ -1,0 +1,198 @@
+{
+  "id": "lmuTest",
+  "name": "LMUTEST",
+  "mapSource": "Map Editor Tool",
+  "elevSource": "Open-Meteo",
+  "nodes": {
+    "n1": {"lat": 33.965827, "lng": -118.425436, "elev": 19.69, "type": "offroad"},
+    "n2": {"lat": 33.965974, "lng": -118.425291, "elev": 19.69, "type": "offroad"},
+    "n3": {"lat": 33.96614, "lng": -118.425153, "elev": 19.69, "type": "offroad"},
+    "n6": {"lat": 33.966296, "lng": -118.425132, "elev": 19.69, "type": "trailhead"},
+    "n7": {"lat": 33.96641, "lng": -118.425096, "elev": 19.69, "type": "trail"},
+    "n8": {"lat": 33.966601, "lng": -118.425014, "elev": 19.69, "type": "trail"},
+    "n9": {"lat": 33.966737, "lng": -118.424856, "elev": 19.69, "type": "trail"},
+    "n10": {"lat": 33.966768, "lng": -118.424511, "elev": 19.69, "type": "trail"},
+    "n11": {"lat": 33.966841, "lng": -118.424179, "elev": 19.69, "type": "trail"},
+    "n12": {"lat": 33.967014, "lng": -118.424001, "elev": 16.4, "type": "trail"},
+    "n13": {"lat": 33.967196, "lng": -118.423917, "elev": 16.4, "type": "trail"},
+    "n14": {"lat": 33.967418, "lng": -118.423824, "elev": 16.4, "type": "trail"},
+    "n15": {"lat": 33.967695, "lng": -118.423726, "elev": 22.97, "type": "trail"},
+    "n16": {"lat": 33.968053, "lng": -118.423559, "elev": 22.97, "type": "trail"},
+    "n17": {"lat": 33.968091, "lng": -118.423345, "elev": 22.97, "type": "trail"},
+    "n18": {"lat": 33.968066, "lng": -118.423146, "elev": 32.81, "type": "trail"},
+    "n19": {"lat": 33.967604, "lng": -118.423441, "elev": 22.97, "type": "trail"},
+    "n20": {"lat": 33.967648, "lng": -118.423597, "elev": 22.97, "type": "trail"},
+    "n21": {"lat": 33.967348, "lng": -118.423533, "elev": 16.4, "type": "trail"},
+    "n22": {"lat": 33.967175, "lng": -118.423626, "elev": 16.4, "type": "trail"},
+    "n23": {"lat": 33.967115, "lng": -118.423828, "elev": 16.4, "type": "trail"},
+    "n24": {"lat": 33.967026, "lng": -118.423742, "elev": 16.4, "type": "trail"},
+    "n25": {"lat": 33.966823, "lng": -118.423865, "elev": 16.4, "type": "trail"},
+    "n26": {"lat": 33.966672, "lng": -118.424005, "elev": 16.4, "type": "trail"},
+    "n27": {"lat": 33.966581, "lng": -118.424123, "elev": 52.49, "type": "trail"},
+    "n28": {"lat": 33.966543, "lng": -118.424461, "elev": 32.81, "type": "trail"},
+    "n29": {"lat": 33.96653, "lng": -118.424758, "elev": 32.81, "type": "trail"},
+    "n30": {"lat": 33.966349, "lng": -118.42497, "elev": 32.81, "type": "trail"}
+  },
+  "edges": {
+    "n1": {
+      "n2": "drive"
+    },
+    "n2": {
+      "n1": "drive",
+      "n3": "drive"
+    },
+    "n3": {
+      "n6": "drive",
+      "n2": "drive"
+    },
+    "n6": {
+      "n7": "walk",
+      "n3": "drive",
+      "n30": "walk"
+    },
+    "n7": {
+      "n8": "walk",
+      "n6": "walk"
+    },
+    "n8": {
+      "n9": "walk",
+      "n7": "walk"
+    },
+    "n9": {
+      "n10": "walk",
+      "n8": "walk"
+    },
+    "n10": {
+      "n11": "walk",
+      "n9": "walk"
+    },
+    "n11": {
+      "n12": "walk",
+      "n10": "walk"
+    },
+    "n12": {
+      "n13": "walk",
+      "n11": "walk",
+      "n23": "walk"
+    },
+    "n13": {
+      "n14": "walk",
+      "n12": "walk",
+      "n23": "walk"
+    },
+    "n14": {
+      "n15": "walk",
+      "n13": "walk"
+    },
+    "n15": {
+      "n14": "walk",
+      "n20": "walk",
+      "n16": "walk"
+    },
+    "n16": {
+      "n17": "walk",
+      "n15": "walk"
+    },
+    "n17": {
+      "n18": "walk",
+      "n16": "walk"
+    },
+    "n18": {
+      "n19": "walk",
+      "n17": "walk"
+    },
+    "n19": {
+      "n21": "walk",
+      "n20": "walk",
+      "n18": "walk"
+    },
+    "n20": {
+      "n19": "walk",
+      "n15": "walk"
+    },
+    "n21": {
+      "n22": "walk",
+      "n19": "walk"
+    },
+    "n22": {
+      "n24": "walk",
+      "n21": "walk"
+    },
+    "n23": {
+      "n13": "walk",
+      "n12": "walk",
+      "n24": "walk"
+    },
+    "n24": {
+      "n23": "walk",
+      "n22": "walk",
+      "n25": "walk"
+    },
+    "n25": {
+      "n26": "walk",
+      "n24": "walk"
+    },
+    "n26": {
+      "n27": "walk",
+      "n25": "walk"
+    },
+    "n27": {
+      "n28": "walk",
+      "n26": "walk"
+    },
+    "n28": {
+      "n29": "walk",
+      "n27": "walk"
+    },
+    "n29": {
+      "n30": "walk",
+      "n28": "walk"
+    },
+    "n30": {
+      "n6": "walk",
+      "n29": "walk"
+    }
+  },
+  "locations": [
+    {
+      "name": "The Cutty Cut",
+      "node_id": "n15",
+      "lat": 33.967695,
+      "lng": -118.423726,
+      "elev": 22.97,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "The Cutty Cut"
+    },
+    {
+      "name": "Smok Spot",
+      "node_id": "n27",
+      "lat": 33.966581,
+      "lng": -118.424123,
+      "elev": 52.49,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Smok Spot"
+    },
+    {
+      "name": "View Spot",
+      "node_id": "n18",
+      "lat": 33.968066,
+      "lng": -118.423146,
+      "elev": 32.81,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "View Spot"
+    },
+    {
+      "name": "Lesser View",
+      "node_id": "n24",
+      "lat": 33.967026,
+      "lng": -118.423742,
+      "elev": 16.4,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Lesser View"
+    }
+  ]
+}
