@@ -1,0 +1,135 @@
+/* === CORE LAYOUT === */
+body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; }
+
+/* === SYSTEM: AR CAMERA VIEWPORT === */
+#camera-container { flex: 1; position: relative; overflow: hidden; background: #111; display: none; align-items: center; justify-content: center; color: #555; }
+#camera-container.active { display: flex; }
+video { width: 100%; height: 100%; object-fit: cover; display: none; }
+video.active { display: block; }
+
+/* AR Node Elements (Injected via JS) */
+.ar-node { position: absolute; top: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 10; display: none; }
+.ar-bubble { background: rgba(40, 167, 69, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid white; white-space: nowrap; }
+.ar-dist { font-size: 14px; margin-top: 5px; text-shadow: 0 1px 2px black; color: #fff; font-weight: bold; }
+.ar-breadcrumb { width: 15px; height: 15px; background: #0078FF; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0, 120, 255, 0.8); }
+
+/* === SYSTEM: UI OVERLAYS === */
+#debug-console { position: absolute; top: 60px; left: 10px; background: rgba(255, 255, 0, 0.8); color: black; padding: 8px; font-size: 11px; z-index: 2000; font-family: monospace; pointer-events: none; border-radius: 4px; display: none; }
+#map { flex: 1; width: 100%; }
+
+/* The main control stack. Uses max-height and overflow-y to prevent buttons from pushing off-screen on small mobile devices. */
+#controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-height: 85vh; overflow-y: auto; padding-right: 10px; scrollbar-width: none; }
+#controls::-webkit-scrollbar { display: none; }
+#data-display { background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px; }
+.data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
+.data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
+
+/* Interactive Buttons */
+.pill-btn { background-color: #444; color: white; border: none; padding: 12px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); text-align: center; width: 120px; transition: background-color 0.2s; }
+.pill-btn.active { background-color: #28a745; }
+#btn-route { background-color: #007bff; }
+#btn-reset { background: #d9534f; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-top: 5px; align-self: flex-end; }
+.btn-row { display: flex; gap: 10px; align-items: center; }
+
+#park-selector { padding: 10px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 160px; background: white; border: 2px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.3); outline: none; }
+
+/* === SYSTEM: MODALS & POPUPS === */
+#chart-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+#chart-container { width: 95%; height: 50%; background: white; border-radius: 8px; padding: 10px; }
+#close-chart { margin-top: 20px; padding: 10px 30px; background: white; border: none; font-weight: bold; border-radius: 50px; cursor: pointer; }
+
+#status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
+#zoom-warning { color: #d9534f; font-size: 13px; font-weight: bold; pointer-events: none; display: none; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Settings Gear & Modal */
+#btn-settings { position: fixed; bottom: 20px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+#settings-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+.settings-content { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: left; color: #333; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+#close-settings { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; color: #888; cursor: pointer; }
+
+.storage-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: center; }
+.grid-header { font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+.grid-cell { font-size: 14px; }
+.name-cell { font-weight: bold; color: #444; }
+.size-cell { font-family: monospace; color: #666; text-align: right; padding-right: 10px; }
+.btn-clear-row { background: #d9534f; color: white; border: none; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width: 100%; transition: 0.2s; }
+
+/* Dynamic Route Legend (Appears above data display) */
+#route-legend { background: rgba(0, 0, 0, 0.8); padding: 10px 15px; border-radius: 12px; margin-bottom: 5px; color: white; display: none; flex-direction: column; gap: 6px; min-width: 140px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+.legend-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: bold; }
+.legend-label { display: flex; align-items: center; gap: 8px; color: #ddd; font-weight: normal; }
+.legend-color { width: 16px; height: 4px; border-radius: 2px; }
+
+/* === SYSTEM: SEARCH BAR === */
+#search-container {
+    display: none !important; /* Intentionally hidden: search UI is built but disabled until mobile button layout is reworked to accommodate it */
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2500; /* Above map and AR camera */
+    width: 90%;
+    max-width: 350px;
+    display: flex;
+    flex-direction: column;
+}
+#search-input {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 25px;
+    border: 2px solid rgba(0,0,0,0.2);
+    font-size: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    outline: none;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.95);
+    transition: all 0.2s;
+}
+#search-input:focus { background: #fff; border-color: #0078FF; }
+#search-results {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    max-height: 250px;
+    overflow-y: auto;
+    display: none;
+}
+#search-results li {
+    padding: 12px 20px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+    line-height: 1.4;
+}
+#search-results li:last-child { border-bottom: none; }
+#search-results li:hover { background: #f0f0f0; }
+
+/* === SYSTEM: MAP CANVAS CONTROLS (Top Right Grid) === */
+.leaflet-right .leaflet-control-layers,
+.leaflet-right .leaflet-locate-control { clear: none !important; float: right !important; }
+
+.leaflet-locate-control {
+    background: white; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box; border-radius: 4px; transition: 0.2s; margin-right: 10px !important;
+}
+
+.map-legend {
+    background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 5px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 12px; line-height: 18px; color: #333; display: none; z-index: 1000; clear: both !important; margin-top: 10px !important;
+}
+.map-legend i { width: 14px; height: 14px; float: left; margin-right: 8px; opacity: 0.8; border: 1px solid #999; }
+
+/* === SYSTEM: WEATHER POPUP STYLES === */
+.weather-popup { text-align: center; min-width: 150px; font-family: sans-serif; }
+.weather-popup h4 { margin: 0 0 5px 0; font-size: 16px; }
+.weather-popup .elev { margin: 0 0 5px 0; color: #555; font-size: 13px; }
+.weather-popup .temp { margin: 0 0 15px 0; font-size: 22px; font-weight: bold; }
+
+.btn-container { display: flex; justify-content: space-between; gap: 8px; }
+.btn-weather { flex: 1; padding: 6px; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+.btn-24hr { background: #0078FF; }
+.btn-24hr:hover { background: #0056b3; }
+.btn-7day { background: #28a745; }
+.btn-7day:hover { background: #1e7e34; }

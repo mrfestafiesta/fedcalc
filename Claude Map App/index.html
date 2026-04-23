@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Dynamic Tracker: Decoupled AR & Routing</title>
+
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+    <div id="search-container">
+        <input type="text" id="search-input" placeholder="Search for a place..." autocomplete="off">
+        <ul id="search-results"></ul>
+    </div>
+
+    <div id="status-pill" style="display: none; opacity: 0; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 25px; z-index: 5000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 14px; font-weight: bold; pointer-events: none; transition: opacity 0.3s ease-in-out;">
+        Status Message
+    </div>
+
+    <div id="status">Initializing...</div>
+    <div id="debug-console">Waiting for GPS...</div>
+
+    <div id="camera-container">
+        <span id="camera-placeholder">Camera Paused</span>
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div id="forecast-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:12px; z-index:4000; box-shadow:0 10px 25px rgba(0,0,0,0.5); width: 320px; font-family: sans-serif; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 id="forecast-title" style="margin:0;">Weather Forecast</h3>
+            <button onclick="document.getElementById('forecast-modal').style.display='none'" style="background: none; border: none; font-size: 20px; cursor: pointer;">✖</button>
+        </div>
+        <div id="forecast-content">Loading...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="controls">
+        <div id="route-legend"></div>
+
+        <div id="data-display">
+            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+            <button id="btn-reset">RESET TRIP</button>
+        </div>
+
+        <select id="park-selector">
+            <option value="">-- Choose Park --</option>
+        </select>
+
+        <button id="btn-route" class="pill-btn">Show Route</button>
+        <button id="btn-compass" class="pill-btn">Compass</button>
+        <button id="btn-graph" class="pill-btn">Elevations</button>
+        <button id="btn-cam" class="pill-btn">Camera Off</button>
+
+        <div class="btn-row">
+            <button id="btn-path" class="pill-btn">GPS Path</button>
+            <span id="zoom-warning">Digital Zoom</span>
+        </div>
+    </div>
+
+    <button id="btn-settings" title="Settings">⚙️</button>
+
+    <div id="settings-modal">
+        <div class="settings-content">
+            <span id="close-settings">&times;</span>
+
+            <h3 style="margin-top: 0; margin-bottom: 15px;">Device Management</h3>
+            <div class="storage-grid" style="grid-template-columns: 1fr auto; margin-bottom: 30px;">
+                <div class="grid-header">Wake Lock</div>
+                <div class="grid-cell action-cell">
+                    <button id="btn-wake" class="btn-clear-row" style="background: #6c757d; width: 90px; padding: 8px;">🔒 Off</button>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 0; margin-bottom: 20px;">Storage Management</h3>
+            <div class="storage-grid">
+                <div class="grid-header">Data Type</div>
+                <div class="grid-header" style="text-align: right; padding-right: 10px;">Size</div>
+                <div class="grid-header" style="text-align: center;">Action</div>
+
+                <div class="grid-cell name-cell">App Data</div>
+                <div class="grid-cell size-cell" id="size-app">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-app" class="btn-clear-row">Clear</button></div>
+
+                <div class="grid-cell name-cell">Map Data</div>
+                <div class="grid-cell size-cell" id="size-map">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-map" class="btn-clear-row">Clear</button></div>
+
+                <div class="grid-cell name-cell">POI Data</div>
+                <div class="grid-cell size-cell" id="size-poi">Calc...</div>
+                <div class="grid-cell action-cell"><button id="btn-clear-poi" class="btn-clear-row">Clear</button></div>
+
+                <div class="grid-cell name-cell">Path Data</div>
+                <div class="grid-cell size-cell" id="size-path">Calc...</div>
+                <div class="grid-cell action-cell" style="display: flex; gap: 5px;">
+                    <button id="btn-export-path" class="btn-clear-row" style="background: #0078FF;">Export</button>
+                    <button id="btn-clear-path" class="btn-clear-row">Clear</button>
+                </div>
+            </div>
+
+            <button id="btn-force-update" style="margin-top: 20px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: 0.2s;">Check for Updates</button>
+        </div>
+    </div>
+
+    <div id="chart-modal">
+        <div id="chart-container"><canvas id="elevationChart"></canvas></div>
+        <button id="close-chart">Close Graph</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="./js/main.js"></script>
+
+</body>
+</html>
