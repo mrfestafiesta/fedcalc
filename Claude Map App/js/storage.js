@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { getPathSizeMB } from './gps.js';
 
-const CACHES = { app: 'tracker-shell-v1', map: 'map-tiles', poi: 'tracker-data-v1' };
+export const CACHES = { app: 'tracker-shell-v1', map: 'map-tiles', poi: 'tracker-data-v1' };
 
 export async function getCacheSizeMB(cacheName, isTiles = false) {
     if (!('caches' in window)) return "0.00";
@@ -91,7 +91,12 @@ export async function forceUpdate() {
         let updatesFound = false;
 
         // Check app shell files
-        const shellFiles = ['./index.html', './styles.css', './js/main.js'];
+        const shellFiles = [
+            './index.html', './styles.css',
+            './js/main.js', './js/state.js', './js/map.js',
+            './js/weather.js', './js/routing.js', './js/ar.js',
+            './js/gps.js', './js/storage.js'
+        ];
         for (const filePath of shellFiles) {
             const liveRes = await fetch(filePath, { cache: 'no-store' });
             const liveText = await liveRes.clone().text();

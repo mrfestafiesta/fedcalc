@@ -1,15 +1,13 @@
 import { state, compassEvent } from './state.js';
-import { map, userMarker, routeLayer, dotLayer, dynamicPoiLayer, trailPathLayer } from './map.js';
+import { map, routeLayer, dotLayer, dynamicPoiLayer, trailPathLayer } from './map.js';
 import { fetchAndSetPOIData, fetchForecast } from './weather.js';
-import { getClosestNode, findShortestPath, formatRouteDist } from './routing.js';
+import { getClosestNode, findShortestPath, formatRouteDist, getRoutingProvider, getMapboxKey, setRoutingAttribution, fetchStreetRoute, initRoutingSettingsUI } from './routing.js';
 import { clearARWorld, buildARWorld, handleOrientation, toggleCompassUI } from './ar.js';
-import { loadSavedTrip, startGPSLogger, exportPathAsGeoJSON, clearPathData } from './gps.js';
-import { refreshStorageNumbers, requestWakeLock, showStatusPill, registerServiceWorker, forceUpdate } from './storage.js';
+import { loadSavedTrip, startGPSLogger, startPositionWatch, exportPathAsGeoJSON, clearPathData } from './gps.js';
+import { CACHES, refreshStorageNumbers, requestWakeLock, showStatusPill, registerServiceWorker, forceUpdate } from './storage.js';
 
 // Inline HTML popup buttons call window.fetchForecast — expose it here
 window.fetchForecast = fetchForecast;
-
-const CACHES = { app: 'tracker-shell-v1', map: 'map-tiles', poi: 'tracker-data-v1' };
 
 // === PARK MENU LOADER ===
 async function loadParkMenu() {
@@ -189,7 +187,6 @@ document.getElementById('btn-cam').addEventListener('click', async () => {
             camPlaceholder.style.display = 'none';
             cameraContainer.classList.add('active');
             state.isCameraOn = true;
-            btnCam.textContent = "Camera On";
             btnCam.classList.add('active');
             setTimeout(() => map.invalidateSize(), 100);
             buildARWorld();
@@ -201,7 +198,6 @@ document.getElementById('btn-cam').addEventListener('click', async () => {
         camPlaceholder.style.display = 'block';
         cameraContainer.classList.remove('active');
         state.isCameraOn = false;
-        btnCam.textContent = "Camera Off";
         btnCam.classList.remove('active');
         clearARWorld();
         setTimeout(() => map.invalidateSize(), 100);
@@ -221,38 +217,13 @@ document.getElementById('btn-compass').addEventListener('click', async () => {
     } else { window.removeEventListener(compassEvent, handleOrientation); toggleCompassUI(false); }
 });
 
-// === GPS TRACKING ===
-if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(
-        (pos) => {
-            state.latestFix = {
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                alt: pos.coords.altitude || 0,
-                acc: pos.coords.accuracy
-            };
-            userMarker.setLatLng([state.latestFix.lat, state.latestFix.lng]);
-            const altFeet = (state.latestFix.alt * 3.28084).toFixed(0);
-            document.getElementById('status').innerText = `GPS Active\nAcc: ${state.latestFix.acc.toFixed(0)}m`;
-            document.getElementById('elev-val').innerText = `${altFeet} ft`;
-        },
-        () => { document.getElementById('status').innerText = "Waiting for GPS..."; },
-        { enableHighAccuracy: true, maximumAge: 0 }
-    );
-}
-
 // === GPS PATH BUTTON ===
 document.getElementById('btn-path').addEventListener('click', () => {
     state.isPathOn = !state.isPathOn;
     const btnPath = document.getElementById('btn-path');
-    if (state.isPathOn) {
-        btnPath.textContent = "Recording...";
-        btnPath.classList.add('active');
-        if (!state.lastLoggedFix && state.latestFix) state.lastLoggedFix = state.latestFix;
-    } else {
-        btnPath.textContent = "GPS Path Off";
-        btnPath.classList.remove('active');
-    }
+    btnPath.classList.toggle('active', state.isPathOn);
+    document.getElementById('data-display').style.display = state.isPathOn ? 'flex' : 'none';
+    if (state.isPathOn && !state.lastLoggedFix && state.latestFix) state.lastLoggedFix = state.latestFix;
 });
 
 // === RESET TRIP ===
@@ -307,15 +278,10 @@ document.getElementById('btn-route').addEventListener('click', async () => {
 
         // === EXTERNAL GEOFENCE BYPASS: target outside park, use street routing only ===
         if (state.selectedPOI.isExternal) {
-            const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${state.latestFix.lng},${state.latestFix.lat};${state.selectedPOI.lng},${state.selectedPOI.lat}?geometries=geojson&overview=full`;
-            const res = await fetch(osrmUrl);
-            if (!res.ok) throw new Error("OSRM API returned " + res.status);
-            const data = await res.json();
-            if (data.routes && data.routes.length > 0) {
-                distBlue = data.routes[0].distance * 3.28084;
-                const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                L.polyline(coords, { color: '#0078FF', weight: 6, opacity: 0.8 }).addTo(routeLayer);
-            } else throw new Error("No route found");
+            const route = await fetchStreetRoute(state.latestFix.lng, state.latestFix.lat, state.selectedPOI.lng, state.selectedPOI.lat);
+            distBlue = route.distance * 3.28084;
+            L.polyline(route.coords, { color: '#0078FF', weight: 6, opacity: 0.8 }).addTo(routeLayer);
+            setRoutingAttribution(getRoutingProvider());
 
             if (routeLayer.getLayers().length > 0) map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
             const legendDiv = document.getElementById('route-legend');
@@ -394,19 +360,15 @@ document.getElementById('btn-route').addEventListener('click', async () => {
         if (needsDrivingRoute) {
             const targetNode = state.activeParkData.nodes[startNodeId];
             try {
-                const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${state.latestFix.lng},${state.latestFix.lat};${targetNode.lng},${targetNode.lat}?geometries=geojson&overview=full`;
-                const res = await fetch(osrmUrl);
-                if (!res.ok) throw new Error("OSRM API returned " + res.status);
-                const data = await res.json();
-                if (data.routes && data.routes.length > 0) {
-                    distBlue = data.routes[0].distance * 3.28084;
-                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    L.polyline(coords, { color: '#0078FF', weight: 6, opacity: 0.8 }).addTo(routeLayer);
-                } else throw new Error("No route found");
+                const route = await fetchStreetRoute(state.latestFix.lng, state.latestFix.lat, targetNode.lng, targetNode.lat);
+                distBlue = route.distance * 3.28084;
+                L.polyline(route.coords, { color: '#0078FF', weight: 6, opacity: 0.8 }).addTo(routeLayer);
+                setRoutingAttribution(getRoutingProvider());
             } catch (e) {
-                // OSRM unavailable — render a straight dashed fallback line
+                // Provider unavailable — render a straight dashed fallback line
                 distBlue = map.distance([state.latestFix.lat, state.latestFix.lng], [targetNode.lat, targetNode.lng]) * 3.28084;
                 L.polyline([[state.latestFix.lat, state.latestFix.lng], [targetNode.lat, targetNode.lng]], { color: '#0078FF', weight: 4, dashArray: '5, 10' }).addTo(routeLayer);
+                setRoutingAttribution('fallback');
             }
         }
 
@@ -426,6 +388,7 @@ document.getElementById('btn-route').addEventListener('click', async () => {
         console.error("Routing error:", err);
         alert(err.message || "An error occurred while calculating the route.");
         document.getElementById('btn-route').innerText = "Show Route";
+        setRoutingAttribution('fallback');
     }
 });
 
@@ -449,8 +412,12 @@ document.addEventListener('visibilitychange', async () => {
 
 // === SETTINGS MODAL ===
 document.getElementById('btn-settings').addEventListener('click', () => {
+    // Reset to first tab on open
+    document.querySelectorAll('.settings-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+    document.querySelectorAll('.settings-panel').forEach((p, i) => p.classList.toggle('active', i === 0));
     document.getElementById('settings-modal').style.display = 'flex';
     refreshStorageNumbers();
+    initRoutingSettingsUI();
 });
 document.getElementById('close-settings').addEventListener('click', () => {
     document.getElementById('settings-modal').style.display = 'none';
@@ -458,6 +425,34 @@ document.getElementById('close-settings').addEventListener('click', () => {
 window.addEventListener('click', (event) => {
     const settingsModal = document.getElementById('settings-modal');
     if (event.target === settingsModal) settingsModal.style.display = 'none';
+});
+document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+    });
+});
+
+// === ROUTING SETTINGS ===
+document.getElementById('routing-provider-select').addEventListener('change', (e) => {
+    const provider = e.target.value;
+    localStorage.setItem('routing-provider', provider);
+    document.getElementById('mapbox-key-section').style.display = provider === 'mapbox' ? 'block' : 'none';
+    setRoutingAttribution(provider);
+});
+
+document.getElementById('btn-save-mapbox-key').addEventListener('click', () => {
+    const key = document.getElementById('mapbox-key-input').value.trim();
+    const status = document.getElementById('mapbox-key-status');
+    if (key) {
+        localStorage.setItem('mapbox-api-key', key);
+        status.textContent = '✓ Key saved';
+    } else {
+        localStorage.removeItem('mapbox-api-key');
+        status.textContent = 'Key removed';
+    }
 });
 
 // === CACHE CLEAR BUTTONS ===
@@ -486,5 +481,7 @@ document.getElementById('btn-force-update').addEventListener('click', forceUpdat
 // === BOOT ===
 loadParkMenu();
 loadSavedTrip();
+startPositionWatch();
 startGPSLogger();
 registerServiceWorker();
+setRoutingAttribution(getRoutingProvider());

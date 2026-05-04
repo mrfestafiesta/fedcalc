@@ -1,6 +1,6 @@
 import { get, set, del } from 'https://unpkg.com/idb-keyval@6.2.1/dist/index.js';
 import { state } from './state.js';
-import { map, pathLine, dotLayer } from './map.js';
+import { map, userMarker, pathLine, dotLayer } from './map.js';
 
 export async function loadSavedTrip() {
     try {
@@ -80,6 +80,26 @@ export async function exportPathAsGeoJSON() {
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
+}
+
+export function startPositionWatch() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.watchPosition(
+        (pos) => {
+            state.latestFix = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                alt: pos.coords.altitude || 0,
+                acc: pos.coords.accuracy
+            };
+            userMarker.setLatLng([state.latestFix.lat, state.latestFix.lng]);
+            const altFeet = (state.latestFix.alt * 3.28084).toFixed(0);
+            document.getElementById('status').innerText = `GPS Active\nAcc: ${state.latestFix.acc.toFixed(0)}m`;
+            document.getElementById('elev-val').innerText = `${altFeet} ft`;
+        },
+        () => { document.getElementById('status').innerText = "Waiting for GPS..."; },
+        { enableHighAccuracy: true, maximumAge: 0 }
+    );
 }
 
 export async function clearPathData() {

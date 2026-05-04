@@ -41,71 +41,103 @@
 
     <div id="map"></div>
 
+    <div id="data-display">
+        <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
+        <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
+        <button id="btn-reset">RESET TRIP</button>
+    </div>
+
     <div id="controls">
         <div id="route-legend"></div>
-
-        <div id="data-display">
-            <div class="data-row"><span>Dist:</span><span id="dist-val" class="data-val">0.0 ft</span></div>
-            <div class="data-row"><span>Elev:</span><span id="elev-val" class="data-val">-- ft</span></div>
-            <button id="btn-reset">RESET TRIP</button>
-        </div>
 
         <select id="park-selector">
             <option value="">-- Choose Park --</option>
         </select>
 
         <button id="btn-route" class="pill-btn">Show Route</button>
-        <button id="btn-compass" class="pill-btn">Compass</button>
         <button id="btn-graph" class="pill-btn">Elevations</button>
-        <button id="btn-cam" class="pill-btn">Camera Off</button>
 
         <div class="btn-row">
-            <button id="btn-path" class="pill-btn">GPS Path</button>
             <span id="zoom-warning">Digital Zoom</span>
         </div>
     </div>
 
+    <button id="btn-cam" title="Toggle Camera">📷</button>
+    <button id="btn-compass" title="Toggle Compass">🧭</button>
+    <button id="btn-path" title="Toggle GPS Path">🥾</button>
     <button id="btn-settings" title="Settings">⚙️</button>
 
     <div id="settings-modal">
         <div class="settings-content">
             <span id="close-settings">&times;</span>
 
-            <h3 style="margin-top: 0; margin-bottom: 15px;">Device Management</h3>
-            <div class="storage-grid" style="grid-template-columns: 1fr auto; margin-bottom: 30px;">
-                <div class="grid-header">Wake Lock</div>
-                <div class="grid-cell action-cell">
-                    <button id="btn-wake" class="btn-clear-row" style="background: #6c757d; width: 90px; padding: 8px;">🔒 Off</button>
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="device-storage">Device & Storage</button>
+                <button class="settings-tab" data-tab="map-settings">Map Settings</button>
+            </div>
+
+            <div class="settings-panel active" id="tab-device-storage">
+                <h3 style="margin-top: 0; margin-bottom: 15px;">Device Management</h3>
+                <div class="storage-grid" style="grid-template-columns: 1fr auto; margin-bottom: 30px;">
+                    <div class="grid-header">Wake Lock</div>
+                    <div class="grid-cell action-cell">
+                        <button id="btn-wake" class="btn-clear-row" style="background: #6c757d; width: 90px; padding: 8px;">🔒 Off</button>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 0; margin-bottom: 20px;">Storage Management</h3>
+                <div class="storage-grid">
+                    <div class="grid-header">Data Type</div>
+                    <div class="grid-header" style="text-align: right; padding-right: 10px;">Size</div>
+                    <div class="grid-header" style="text-align: center;">Action</div>
+
+                    <div class="grid-cell name-cell">App Data</div>
+                    <div class="grid-cell size-cell" id="size-app">Calc...</div>
+                    <div class="grid-cell action-cell"><button id="btn-clear-app" class="btn-clear-row">Clear</button></div>
+
+                    <div class="grid-cell name-cell">Map Data</div>
+                    <div class="grid-cell size-cell" id="size-map">Calc...</div>
+                    <div class="grid-cell action-cell"><button id="btn-clear-map" class="btn-clear-row">Clear</button></div>
+
+                    <div class="grid-cell name-cell">POI Data</div>
+                    <div class="grid-cell size-cell" id="size-poi">Calc...</div>
+                    <div class="grid-cell action-cell"><button id="btn-clear-poi" class="btn-clear-row">Clear</button></div>
+
+                    <div class="grid-cell name-cell">Path Data</div>
+                    <div class="grid-cell size-cell" id="size-path">Calc...</div>
+                    <div class="grid-cell action-cell" style="display: flex; gap: 5px;">
+                        <button id="btn-export-path" class="btn-clear-row" style="background: #0078FF;">Export</button>
+                        <button id="btn-clear-path" class="btn-clear-row">Clear</button>
+                    </div>
+                </div>
+
+                <button id="btn-force-update" style="margin-top: 20px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: 0.2s;">Check for Updates</button>
+            </div>
+
+            <div class="settings-panel" id="tab-map-settings">
+                <h3 style="margin-top: 0; margin-bottom: 15px;">Street Routing</h3>
+                <div style="margin-bottom: 20px;">
+                    <div class="storage-grid" style="grid-template-columns: 1fr auto; margin-bottom: 10px;">
+                        <div class="grid-header">Provider</div>
+                        <div class="grid-cell">
+                            <select id="routing-provider-select" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; background: white; cursor: pointer;">
+                                <option value="osrm">OSRM (Unreliable)</option>
+                                <option value="mapbox">Mapbox</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="mapbox-key-section" style="display: none;">
+                        <div class="grid-header" style="margin-bottom: 6px;">Mapbox API Key</div>
+                        <input type="password" id="mapbox-key-input" placeholder="pk.eyJ1..."
+                               style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; box-sizing: border-box; margin-bottom: 8px; font-family: monospace;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button id="btn-save-mapbox-key" class="btn-clear-row" style="background: #28a745; flex: 1;">Save Key</button>
+                            <span id="mapbox-key-status" style="font-size: 12px; color: #28a745; font-weight: bold;"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <h3 style="margin-top: 0; margin-bottom: 20px;">Storage Management</h3>
-            <div class="storage-grid">
-                <div class="grid-header">Data Type</div>
-                <div class="grid-header" style="text-align: right; padding-right: 10px;">Size</div>
-                <div class="grid-header" style="text-align: center;">Action</div>
-
-                <div class="grid-cell name-cell">App Data</div>
-                <div class="grid-cell size-cell" id="size-app">Calc...</div>
-                <div class="grid-cell action-cell"><button id="btn-clear-app" class="btn-clear-row">Clear</button></div>
-
-                <div class="grid-cell name-cell">Map Data</div>
-                <div class="grid-cell size-cell" id="size-map">Calc...</div>
-                <div class="grid-cell action-cell"><button id="btn-clear-map" class="btn-clear-row">Clear</button></div>
-
-                <div class="grid-cell name-cell">POI Data</div>
-                <div class="grid-cell size-cell" id="size-poi">Calc...</div>
-                <div class="grid-cell action-cell"><button id="btn-clear-poi" class="btn-clear-row">Clear</button></div>
-
-                <div class="grid-cell name-cell">Path Data</div>
-                <div class="grid-cell size-cell" id="size-path">Calc...</div>
-                <div class="grid-cell action-cell" style="display: flex; gap: 5px;">
-                    <button id="btn-export-path" class="btn-clear-row" style="background: #0078FF;">Export</button>
-                    <button id="btn-clear-path" class="btn-clear-row">Clear</button>
-                </div>
-            </div>
-
-            <button id="btn-force-update" style="margin-top: 20px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: 0.2s;">Check for Updates</button>
         </div>
     </div>
 

@@ -47,3 +47,46 @@ export function findShortestPath(startNodeId, endNodeId, graphData) {
 export function formatRouteDist(feet) {
     return feet > 5280 ? (feet / 5280).toFixed(1) + ' mi' : feet.toFixed(0) + ' ft';
 }
+
+// === STREET ROUTING PROVIDER ===
+export function getRoutingProvider() { return localStorage.getItem('routing-provider') || 'osrm'; }
+export function getMapboxKey() { return localStorage.getItem('mapbox-api-key') || ''; }
+
+let _routingAttribution = '';
+export function setRoutingAttribution(type) {
+    if (_routingAttribution) map.attributionControl.removeAttribution(_routingAttribution);
+    const labels = {
+        osrm:     'Street: OSRM',
+        mapbox:   'Street: <a href="https://www.mapbox.com/">Mapbox</a>',
+        fallback: 'Street: Fallback'
+    };
+    _routingAttribution = labels[type] || '';
+    if (_routingAttribution) map.attributionControl.addAttribution(_routingAttribution);
+}
+
+export async function fetchStreetRoute(fromLng, fromLat, toLng, toLat) {
+    const provider = getRoutingProvider();
+    const url = provider === 'mapbox'
+        ? `https://api.mapbox.com/directions/v5/mapbox/driving/${fromLng},${fromLat};${toLng},${toLat}?geometries=geojson&overview=full&access_token=${getMapboxKey()}`
+        : `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?geometries=geojson&overview=full`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Routing API returned ${res.status}`);
+    const data = await res.json();
+    if (!data.routes || data.routes.length === 0) throw new Error('No route found');
+    return {
+        distance: data.routes[0].distance,
+        coords: data.routes[0].geometry.coordinates.map(c => [c[1], c[0]])
+    };
+}
+
+export function initRoutingSettingsUI() {
+    const select = document.getElementById('routing-provider-select');
+    const keySection = document.getElementById('mapbox-key-section');
+    const keyInput = document.getElementById('mapbox-key-input');
+    const keyStatus = document.getElementById('mapbox-key-status');
+    select.value = getRoutingProvider();
+    keySection.style.display = select.value === 'mapbox' ? 'block' : 'none';
+    const savedKey = getMapboxKey();
+    keyInput.value = savedKey;
+    keyStatus.textContent = savedKey ? '✓ Key saved' : '';
+}

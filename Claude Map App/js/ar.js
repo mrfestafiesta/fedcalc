@@ -102,15 +102,6 @@ export function handleOrientation(e) {
 
 export function toggleCompassUI(turningOn) {
     state.isCompassActive = turningOn;
-    const btnCompass = document.getElementById('btn-compass');
-    const debugDiv = document.getElementById('debug-console');
-    if (turningOn) {
-        btnCompass.innerText = "Disable Compass";
-        btnCompass.classList.add('active');
-        debugDiv.style.display = 'block';
-    } else {
-        btnCompass.innerText = "Enable Compass";
-        btnCompass.classList.remove('active');
-        debugDiv.style.display = 'none';
-    }
+    document.getElementById('btn-compass').classList.toggle('active', turningOn);
+    document.getElementById('debug-console').style.display = turningOn ? 'block' : 'none';
 }

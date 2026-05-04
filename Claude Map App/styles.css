@@ -20,7 +20,7 @@ video.active { display: block; }
 /* The main control stack. Uses max-height and overflow-y to prevent buttons from pushing off-screen on small mobile devices. */
 #controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-height: 85vh; overflow-y: auto; padding-right: 10px; scrollbar-width: none; }
 #controls::-webkit-scrollbar { display: none; }
-#data-display { background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; margin-bottom: 5px; color: white; display: flex; flex-direction: column; min-width: 140px; }
+#data-display { display: none; position: fixed; bottom: 20px; right: 80px; z-index: 1000; background: rgba(0, 0, 0, 0.7); padding: 8px 15px; border-radius: 15px; color: white; flex-direction: column; min-width: 140px; }
 .data-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 4px; }
 .data-val { font-weight: bold; font-family: monospace; font-size: 16px; }
 
@@ -41,8 +41,21 @@ video.active { display: block; }
 #status { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none; white-space: pre-line; }
 #zoom-warning { color: #d9534f; font-size: 13px; font-weight: bold; pointer-events: none; display: none; text-transform: uppercase; letter-spacing: 0.5px; }
 
-/* Settings Gear & Modal */
+/* Settings Tabs */
+.settings-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+.settings-tab { flex: 1; padding: 10px 6px; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; font-size: 13px; font-weight: bold; color: #aaa; cursor: pointer; transition: 0.2s; }
+.settings-tab.active { color: #333; border-bottom-color: #28a745; }
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+
+/* Settings Gear & Compass Icon Buttons */
 #btn-settings { position: fixed; bottom: 20px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); color: white; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+#btn-path   { position: fixed; bottom: 80px;  right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: filter 0.3s; filter: grayscale(100%); }
+#btn-path.active { filter: grayscale(0%); }
+#btn-compass { position: fixed; bottom: 140px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: filter 0.3s; filter: grayscale(100%); }
+#btn-compass.active { filter: grayscale(0%); }
+#btn-cam { position: fixed; bottom: 200px; right: 20px; z-index: 2000; background: rgba(50, 50, 50, 0.9); border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: filter 0.3s; filter: grayscale(100%); padding: 0 0 4px 0; line-height: 1; }
+#btn-cam.active { filter: grayscale(0%); }
 #settings-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
 .settings-content { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; text-align: left; color: #333; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
 #close-settings { position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; color: #888; cursor: pointer; }
