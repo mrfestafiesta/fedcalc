@@ -1,0 +1,471 @@
+{
+  "id": "red_rock_canyon_sp",
+  "name": "RED ROCK CANYON SP",
+  "mapSource": "Map Editor Tool",
+  "elevSource": "USGS",
+  "nodes": {
+    "n1": {"lat": 35.373069, "lng": -117.991254, "elev": 2592.44, "type": "offroad"},
+    "n2": {"lat": 35.373163, "lng": -117.991812, "elev": 2597.87, "type": "offroad"},
+    "n3": {"lat": 35.373237, "lng": -117.992247, "elev": 2600.62, "type": "offroad"},
+    "n4": {"lat": 35.373264, "lng": -117.992582, "elev": 2603.74, "type": "offroad"},
+    "n5": {"lat": 35.373579, "lng": -117.993261, "elev": 2609.35, "type": "offroad"},
+    "n6": {"lat": 35.37364, "lng": -117.993489, "elev": 2611.52, "type": "offroad"},
+    "n7": {"lat": 35.373504, "lng": -117.994081, "elev": 2616.7, "type": "offroad"},
+    "n8": {"lat": 35.373568, "lng": -117.99436, "elev": 2618.54, "type": "offroad"},
+    "n9": {"lat": 35.373986, "lng": -117.995267, "elev": 2629.11, "type": "offroad"},
+    "n10": {"lat": 35.374327, "lng": -117.995661, "elev": 2637.09, "type": "offroad"},
+    "n11": {"lat": 35.374572, "lng": -117.996163, "elev": 2642.95, "type": "offroad"},
+    "n12": {"lat": 35.374618, "lng": -117.996326, "elev": 2645.53, "type": "offroad"},
+    "n13": {"lat": 35.374552, "lng": -117.996503, "elev": 2648.05, "type": "offroad"},
+    "n14": {"lat": 35.374441, "lng": -117.996579, "elev": 2649.32, "type": "offroad"},
+    "n16": {"lat": 35.373971, "lng": -117.996501, "elev": 2648.41, "type": "offroad"},
+    "n17": {"lat": 35.37359, "lng": -117.99641, "elev": 2648.31, "type": "offroad"},
+    "n18": {"lat": 35.373275, "lng": -117.996275, "elev": 2643.57, "type": "offroad"},
+    "n19": {"lat": 35.373039, "lng": -117.996292, "elev": 2643.77, "type": "offroad"},
+    "n20": {"lat": 35.372798, "lng": -117.996479, "elev": 2647.61, "type": "offroad"},
+    "n21": {"lat": 35.372396, "lng": -117.996882, "elev": 2658.38, "type": "offroad"},
+    "n22": {"lat": 35.371963, "lng": -117.996951, "elev": 2659.31, "type": "offroad"},
+    "n23": {"lat": 35.3717, "lng": -117.997048, "elev": 2660.89, "type": "offroad"},
+    "n24": {"lat": 35.371245, "lng": -117.997268, "elev": 2666.09, "type": "offroad"},
+    "n25": {"lat": 35.370904, "lng": -117.997321, "elev": 2672.11, "type": "offroad"},
+    "n26": {"lat": 35.370352, "lng": -117.997107, "elev": 2664.2, "type": "offroad"},
+    "n27": {"lat": 35.369823, "lng": -117.996957, "elev": 2656.02, "type": "offroad"},
+    "n28": {"lat": 35.369613, "lng": -117.996737, "elev": 2655.18, "type": "offroad"},
+    "n29": {"lat": 35.369438, "lng": -117.996452, "elev": 2656.28, "type": "offroad"},
+    "n30": {"lat": 35.369346, "lng": -117.995991, "elev": 2654.45, "type": "offroad"},
+    "n31": {"lat": 35.369289, "lng": -117.995342, "elev": 2647.21, "type": "offroad"},
+    "n32": {"lat": 35.369223, "lng": -117.995095, "elev": 2644, "type": "offroad"},
+    "n33": {"lat": 35.369005, "lng": -117.994752, "elev": 2642.48, "type": "offroad"},
+    "n34": {"lat": 35.36886, "lng": -117.994537, "elev": 2644.22, "type": "offroad"},
+    "n35": {"lat": 35.36865, "lng": -117.994296, "elev": 2645.67, "type": "offroad"},
+    "n36": {"lat": 35.368383, "lng": -117.994044, "elev": 2646.73, "type": "offroad"},
+    "n38": {"lat": 35.367884, "lng": -117.993979, "elev": 2649.8, "type": "offroad"},
+    "n39": {"lat": 35.367556, "lng": -117.994097, "elev": 2656.23, "type": "offroad"},
+    "n40": {"lat": 35.368538, "lng": -117.993523, "elev": 2636.91, "type": "offroad"},
+    "n41": {"lat": 35.368954, "lng": -117.993309, "elev": 2629.51, "type": "offroad"},
+    "n42": {"lat": 35.369269, "lng": -117.993255, "elev": 2624.28, "type": "offroad"},
+    "n43": {"lat": 35.369859, "lng": -117.993245, "elev": 2615.92, "type": "offroad"},
+    "n44": {"lat": 35.370371, "lng": -117.993121, "elev": 2609.82, "type": "offroad"},
+    "n45": {"lat": 35.370659, "lng": -117.992982, "elev": 2606.3, "type": "offroad"},
+    "n46": {"lat": 35.370975, "lng": -117.992671, "elev": 2602.81, "type": "offroad"},
+    "n47": {"lat": 35.371469, "lng": -117.992424, "elev": 2597.35, "type": "offroad"},
+    "n48": {"lat": 35.371648, "lng": -117.992316, "elev": 2595.86, "type": "offroad"},
+    "n49": {"lat": 35.371784, "lng": -117.992113, "elev": 2594.13, "type": "offroad"},
+    "n50": {"lat": 35.372073, "lng": -117.991351, "elev": 2589.12, "type": "offroad"},
+    "n51": {"lat": 35.37219, "lng": -117.991123, "elev": 2587.65, "type": "offroad"},
+    "n52": {"lat": 35.372488, "lng": -117.990774, "elev": 2589.04, "type": "offroad"},
+    "n53": {"lat": 35.372792, "lng": -117.990396, "elev": 2586.56, "type": "offroad"},
+    "n54": {"lat": 35.372895, "lng": -117.990302, "elev": 2586.04, "type": "offroad"},
+    "n55": {"lat": 35.373067, "lng": -117.99027, "elev": 2585.59, "type": "offroad"},
+    "n56": {"lat": 35.373129, "lng": -117.991032, "elev": 2590.16, "type": "offroad"},
+    "n57": {"lat": 35.373116, "lng": -117.990696, "elev": 2587.55, "type": "offroad"},
+    "n58": {"lat": 35.373291, "lng": -117.990667, "elev": 2587.98, "type": "offroad"},
+    "n59": {"lat": 35.372956, "lng": -117.990723, "elev": 2587.87, "type": "offroad"},
+    "n60": {"lat": 35.368199, "lng": -117.993762, "elev": 2644.2, "type": "offroad"},
+    "n61": {"lat": 35.372358, "lng": -117.997174, "elev": 2666.43, "type": "offroad"},
+    "n62": {"lat": 35.37226, "lng": -117.997319, "elev": 2669.41, "type": "offroad"},
+    "n63": {"lat": 35.372035, "lng": -117.99748, "elev": 2670.7, "type": "offroad"},
+    "n64": {"lat": 35.371877, "lng": -117.997541, "elev": 2672.87, "type": "offroad"},
+    "n65": {"lat": 35.371634, "lng": -117.997611, "elev": 2676.95, "type": "offroad"},
+    "n66": {"lat": 35.371376, "lng": -117.997617, "elev": 2676.63, "type": "offroad"},
+    "n67": {"lat": 35.371212, "lng": -117.997622, "elev": 2676.83, "type": "offroad"},
+    "n68": {"lat": 35.370938, "lng": -117.997509, "elev": 2675.96, "type": "offroad"},
+    "n69": {"lat": 35.368817, "lng": -117.994717, "elev": 2646.13, "type": "offroad"},
+    "n70": {"lat": 35.368592, "lng": -117.994623, "elev": 2651.08, "type": "offroad"},
+    "n71": {"lat": 35.368373, "lng": -117.994462, "elev": 2653.57, "type": "offroad"},
+    "n72": {"lat": 35.368257, "lng": -117.994363, "elev": 2653.25, "type": "offroad"},
+    "n73": {"lat": 35.368163, "lng": -117.994604, "elev": 2660.05, "type": "offroad"},
+    "n74": {"lat": 35.373268, "lng": -117.990187, "elev": 2586.83, "type": "trailhead"},
+    "n75": {"lat": 35.368035, "lng": -117.993631, "elev": 2646.28, "type": "trailhead"},
+    "n77": {"lat": 35.368965, "lng": -117.995228, "elev": 2650.12, "type": "trail"},
+    "n78": {"lat": 35.368985, "lng": -117.995311, "elev": 2649.5, "type": "trail"},
+    "n79": {"lat": 35.369016, "lng": -117.995354, "elev": 2651.8, "type": "trail"},
+    "n80": {"lat": 35.369142, "lng": -117.995296, "elev": 2647.9, "type": "trailhead"},
+    "n81": {"lat": 35.369106, "lng": -117.995252, "elev": 2647.17, "type": "trail"},
+    "n82": {"lat": 35.369055, "lng": -117.99524, "elev": 2647.43, "type": "trail"},
+    "n83": {"lat": 35.369047, "lng": -117.995308, "elev": 2648.88, "type": "trail"},
+    "n84": {"lat": 35.369009, "lng": -117.995259, "elev": 2648.41, "type": "trail"},
+    "n85": {"lat": 35.368999, "lng": -117.995215, "elev": 2649.53, "type": "trail"},
+    "n86": {"lat": 35.369257, "lng": -117.995213, "elev": 2645.33, "type": "offroad"}
+  },
+  "edges": {
+    "n1": {
+      "n2": "drive",
+      "n56": "drive"
+    },
+    "n2": {
+      "n3": "drive",
+      "n1": "drive"
+    },
+    "n3": {
+      "n4": "drive",
+      "n2": "drive"
+    },
+    "n4": {
+      "n5": "drive",
+      "n3": "drive"
+    },
+    "n5": {
+      "n6": "drive",
+      "n4": "drive"
+    },
+    "n6": {
+      "n7": "drive",
+      "n5": "drive"
+    },
+    "n7": {
+      "n8": "drive",
+      "n6": "drive"
+    },
+    "n8": {
+      "n9": "drive",
+      "n7": "drive"
+    },
+    "n9": {
+      "n10": "drive",
+      "n8": "drive"
+    },
+    "n10": {
+      "n11": "drive",
+      "n9": "drive"
+    },
+    "n11": {
+      "n12": "drive",
+      "n10": "drive"
+    },
+    "n12": {
+      "n13": "drive",
+      "n11": "drive"
+    },
+    "n13": {
+      "n14": "drive",
+      "n12": "drive"
+    },
+    "n14": {
+      "n13": "drive",
+      "n16": "drive"
+    },
+    "n16": {
+      "n17": "drive",
+      "n14": "drive"
+    },
+    "n17": {
+      "n18": "drive",
+      "n16": "drive"
+    },
+    "n18": {
+      "n19": "drive",
+      "n17": "drive"
+    },
+    "n19": {
+      "n20": "drive",
+      "n18": "drive"
+    },
+    "n20": {
+      "n21": "drive",
+      "n19": "drive"
+    },
+    "n21": {
+      "n22": "drive",
+      "n20": "drive",
+      "n61": "drive"
+    },
+    "n22": {
+      "n23": "drive",
+      "n21": "drive"
+    },
+    "n23": {
+      "n24": "drive",
+      "n22": "drive"
+    },
+    "n24": {
+      "n25": "drive",
+      "n23": "drive"
+    },
+    "n25": {
+      "n26": "drive",
+      "n24": "drive",
+      "n68": "drive"
+    },
+    "n26": {
+      "n27": "drive",
+      "n25": "drive"
+    },
+    "n27": {
+      "n28": "drive",
+      "n26": "drive"
+    },
+    "n28": {
+      "n29": "drive",
+      "n27": "drive"
+    },
+    "n29": {
+      "n30": "drive",
+      "n28": "drive"
+    },
+    "n30": {
+      "n31": "drive",
+      "n29": "drive"
+    },
+    "n31": {
+      "n30": "drive",
+      "n86": "drive"
+    },
+    "n32": {
+      "n33": "drive",
+      "n86": "drive"
+    },
+    "n33": {
+      "n34": "drive",
+      "n32": "drive",
+      "n69": "drive"
+    },
+    "n34": {
+      "n35": "drive",
+      "n33": "drive"
+    },
+    "n35": {
+      "n36": "drive",
+      "n34": "drive"
+    },
+    "n36": {
+      "n35": "drive",
+      "n60": "drive",
+      "n72": "drive"
+    },
+    "n38": {
+      "n60": "drive",
+      "n39": "drive"
+    },
+    "n39": {
+      "n38": "drive"
+    },
+    "n40": {
+      "n41": "drive",
+      "n60": "drive"
+    },
+    "n41": {
+      "n42": "drive",
+      "n40": "drive"
+    },
+    "n42": {
+      "n43": "drive",
+      "n41": "drive"
+    },
+    "n43": {
+      "n44": "drive",
+      "n42": "drive"
+    },
+    "n44": {
+      "n45": "drive",
+      "n43": "drive"
+    },
+    "n45": {
+      "n46": "drive",
+      "n44": "drive"
+    },
+    "n46": {
+      "n47": "drive",
+      "n45": "drive"
+    },
+    "n47": {
+      "n48": "drive",
+      "n46": "drive"
+    },
+    "n48": {
+      "n49": "drive",
+      "n47": "drive"
+    },
+    "n49": {
+      "n50": "drive",
+      "n48": "drive"
+    },
+    "n50": {
+      "n51": "drive",
+      "n49": "drive"
+    },
+    "n51": {
+      "n52": "drive",
+      "n50": "drive"
+    },
+    "n52": {
+      "n53": "drive",
+      "n51": "drive"
+    },
+    "n53": {
+      "n54": "drive",
+      "n52": "drive"
+    },
+    "n54": {
+      "n55": "drive",
+      "n59": "drive",
+      "n53": "drive"
+    },
+    "n55": {
+      "n57": "drive",
+      "n54": "drive",
+      "n74": "walk"
+    },
+    "n56": {
+      "n1": "drive",
+      "n57": "drive"
+    },
+    "n57": {
+      "n56": "drive",
+      "n58": "drive",
+      "n55": "drive"
+    },
+    "n58": {
+      "n57": "drive"
+    },
+    "n59": {
+      "n54": "drive"
+    },
+    "n60": {
+      "n40": "drive",
+      "n36": "drive",
+      "n38": "drive",
+      "n75": "walk"
+    },
+    "n61": {
+      "n62": "drive",
+      "n21": "drive"
+    },
+    "n62": {
+      "n63": "drive",
+      "n61": "drive"
+    },
+    "n63": {
+      "n64": "drive",
+      "n62": "drive"
+    },
+    "n64": {
+      "n65": "drive",
+      "n63": "drive"
+    },
+    "n65": {
+      "n66": "drive",
+      "n64": "drive"
+    },
+    "n66": {
+      "n67": "drive",
+      "n65": "drive"
+    },
+    "n67": {
+      "n68": "drive",
+      "n66": "drive"
+    },
+    "n68": {
+      "n25": "drive",
+      "n67": "drive"
+    },
+    "n69": {
+      "n70": "drive",
+      "n33": "drive"
+    },
+    "n70": {
+      "n71": "drive",
+      "n69": "drive"
+    },
+    "n71": {
+      "n72": "drive",
+      "n70": "drive"
+    },
+    "n72": {
+      "n36": "drive",
+      "n73": "drive",
+      "n71": "drive"
+    },
+    "n73": {
+      "n72": "drive"
+    },
+    "n74": {
+      "n55": "walk"
+    },
+    "n75": {
+      "n60": "walk"
+    },
+    "n77": {
+      "n85": "walk"
+    },
+    "n78": {
+      "n84": "walk"
+    },
+    "n79": {
+      "n83": "walk"
+    },
+    "n80": {
+      "n81": "walk",
+      "n86": "walk"
+    },
+    "n81": {
+      "n80": "walk",
+      "n83": "walk",
+      "n82": "walk"
+    },
+    "n82": {
+      "n81": "walk",
+      "n84": "walk"
+    },
+    "n83": {
+      "n81": "walk",
+      "n79": "walk"
+    },
+    "n84": {
+      "n82": "walk",
+      "n78": "walk",
+      "n85": "walk"
+    },
+    "n85": {
+      "n84": "walk",
+      "n77": "walk"
+    },
+    "n86": {
+      "n31": "drive",
+      "n32": "drive",
+      "n80": "walk"
+    }
+  },
+  "locations": [
+    {
+      "name": "Visitor Center",
+      "node_id": "n74",
+      "lat": 35.373268,
+      "lng": -117.990187,
+      "elev": 2586.83,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Visitor Center"
+    },
+    {
+      "name": "Water",
+      "node_id": "n32",
+      "lat": 35.369223,
+      "lng": -117.995095,
+      "elev": 2644,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Water"
+    },
+    {
+      "name": "Desert View Trail",
+      "node_id": "n75",
+      "lat": 35.368035,
+      "lng": -117.993631,
+      "elev": 2646.28,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Desert View Trail"
+    },
+    {
+      "name": "Caves Trailhead",
+      "node_id": "n80",
+      "lat": 35.369142,
+      "lng": -117.995296,
+      "elev": 2647.9,
+      "has_ar": true,
+      "ar_type": "text",
+      "ar_content": "Caves Trailhead"
+    }
+  ]
+}
