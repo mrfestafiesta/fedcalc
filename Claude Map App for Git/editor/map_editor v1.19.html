@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trail Graph Builder v1.18</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; position: relative; }
+        
+        #toolbar { padding: 15px; background: #222; color: white; display: flex; gap: 15px; align-items: center; z-index: 2000; }
+        .toolbar-group { display: flex; flex-direction: column; gap: 6px; }
+        .toolbar-row { display: flex; gap: 10px; align-items: center; }
+        .vertical-divider { width: 1px; background-color: #555; height: 50px; margin: 0 10px; }
+
+        /* NEW: Sub-Toolbar */
+        #subToolbar { padding: 10px 15px; background: #333; color: white; display: flex; gap: 10px; align-items: center; min-height: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 1500; }
+        .sub-btn { padding: 6px 14px; cursor: pointer; border: 1px solid #777; border-radius: 20px; background: #444; color: white; font-size: 13px; font-weight: bold; transition: 0.1s; }
+        .sub-btn.active { border-color: white; box-shadow: 0 0 5px rgba(255,255,255,0.5); }
+        .sub-btn:hover { filter: brightness(1.2); }
+
+        button { padding: 8px 16px; cursor: pointer; font-weight: bold; border: none; border-radius: 4px; }
+        input[type="text"], select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        
+        .mode-btn { 
+            width: 85px; height: 48px; display: flex; align-items: center; justify-content: center; 
+            box-sizing: border-box; text-align: center; line-height: 1.2; padding: 4px; font-size: 13px;
+        }
+        .active-mode { background: #0078FF; color: white; }
+        .inactive-mode { background: #555; color: white; }
+        
+        #btnExport { background: #28a745; height: 35px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; padding: 0 15px; }
+        #btnExport:disabled { background: #555; cursor: not-allowed; }
+        
+        #btnClear { background: #dc3545; color: white; height: 35px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; padding: 0 15px; }
+        #btnClear:hover { background: #c82333; }
+        
+        #status { font-family: monospace; color: #ffcc00; font-size: 13px; text-align: right; }
+        
+        .search-overlay { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 320px; display: flex; flex-direction: column; }
+        .search-overlay input { width: 100%; padding: 12px 15px; border-radius: 6px; border: 2px solid rgba(0,0,0,0.2); box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 15px; background: white; }
+        #suggestions { position: absolute; top: 100%; left: 0; background: white; color: black; width: 100%; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 4px; z-index: 1000; display: none; flex-direction: column; margin-top: 5px; }
+        .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+        .suggestion-item:hover { background: #0078FF; color: white; }
+        
+        /* === SYSTEM: MAP CANVAS CONTROLS (Top Right Grid) === */
+        .leaflet-right .leaflet-control-layers,
+        .leaflet-right .leaflet-locate-control { clear: none !important; float: right !important; }
+        
+        .leaflet-locate-control { background: white; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.65); clear: none !important; margin-right: 10px !important; }
+        .leaflet-locate-control:hover { background: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <div class="toolbar-row">
+            <button id="btnNode" class="active-mode mode-btn">1. Drop<br>Nodes</button>
+            <button id="btnEdge" class="inactive-mode mode-btn">2. Connect<br>Edges</button>
+            <button id="btnPoi" class="inactive-mode mode-btn">3. Tag<br>POIs</button>
+            <button id="btnDelete" class="inactive-mode mode-btn" style="border: 1px solid #ff4444;">4. Erase /<br>Edit</button>
+        </div>
+        
+        <div class="vertical-divider"></div>
+
+        <div class="toolbar-row">
+            <select id="elevSource" style="width: 200px;">
+                <option value="OM">Elev: Open-Meteo (Global)</option>
+                <option value="USGS">Elev: USGS (US-Only)</option>
+            </select>
+        </div>
+
+        <div style="flex-grow: 1;"></div>
+
+        <div class="toolbar-group" style="align-items: flex-end;">
+            <div class="toolbar-row" style="align-items: flex-end;">
+                <button id="btnClear">🗑️ Clear Map</button>
+                <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin-left: 10px;">
+                    <label style="font-size: 12px; color: #aaa; margin-left: 2px;">Park Name? (no spaces)</label>
+                    <input type="text" id="fileName" value="custom_park" placeholder="Filename" style="width: 170px;">
+                </div>
+                
+                <input type="file" id="import-path-file" accept=".geojson" style="display: none;">
+                <button id="btn-import-path" style="background: #e83e8c; color: white; height: 35px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; padding: 0 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 10px;">🛤️ Import GPS Path</button>
+
+                <input type="file" id="import-poi-file" accept=".geojson,.json" style="display: none;">
+                <button id="btn-import-poi" style="background: #ffc107; color: black; height: 35px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; padding: 0 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 10px;">📍 Import POIs</button>
+
+                <input type="file" id="fileImport" accept=".json" style="display: none;">
+                <button id="btnImport" style="background: #17a2b8; height: 35px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; padding: 0 15px; color: white;">⬆️ Load Map</button>
+                <button id="btnExport">⬇️ Export JSON</button>
+            </div>
+            <span id="status">Click map to place a node...</span>
+        </div>
+    </div>
+
+    <div id="subToolbar"></div>
+
+    <div id="import-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; z-index:4000; box-shadow:0 10px 25px rgba(0,0,0,0.5); width: 300px; font-family: sans-serif;">
+        <h3 style="margin-top:0;">Map POI Fields</h3>
+        <p style="font-size: 14px; color: #555;">Select the column that contains the location's name:</p>
+        
+        <select id="import-name-field" style="width: 100%; padding: 8px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #ccc;"></select>
+        
+        <div style="display:flex; justify-content: space-between;">
+            <button id="btn-cancel-import" style="padding: 8px 15px; background: #ddd; color: black; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+            <button id="btn-confirm-import" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Import Nodes</button>
+        </div>
+    </div>
+
+    <div id="map">
+        <div class="search-overlay">
+            <input type="text" id="searchInput" placeholder="Search a park or city..." autocomplete="off">
+            <div id="suggestions"></div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([33.9769, -118.4024], 18);
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, maxNativeZoom: 19 }).addTo(map);
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, attribution: 'Tiles &copy; Esri' });
+        L.control.layers({"Street Map": streetLayer, "Satellite": satelliteLayer}).addTo(map);
+
+        // === SYSTEM: MAP CANVAS GPS CENTER BUTTON ===
+        const LocateControl = L.Control.extend({
+            options: { position: 'topright' }, 
+            onAdd: function () {
+                const btn = L.DomUtil.create('div', 'leaflet-locate-control'); 
+                btn.innerHTML = '📍'; 
+                btn.title = 'Center Map'; 
+                L.DomEvent.disableClickPropagation(btn); 
+                btn.onclick = () => {
+                    // Uses Leaflet's built-in geolocation for the editor
+                    map.locate({setView: true, maxZoom: 18}); 
+                };
+                return btn;
+            }
+        });
+        map.addControl(new LocateControl());
+
+        // --- DATA STRUCTURE & STATE ---
+        let currentMode = 'NODE'; 
+        let activeNodeType = 'trail'; 
+        let activeEdgeType = 'walk';  
+        let selectedElementForEdit = null; 
+        
+        let nodeCounter = 1;
+        let edgeStartNode = null;
+        
+        const drawnItems = L.featureGroup().addTo(map);
+        let graphData = { id: "custom_park", name: "Custom Built Park", mapSource: "Map Editor Tool", elevSource: "pending", nodes: {}, edges: {}, locations: [] };
+
+        // --- UI UPDATERS ---
+        const subToolbar = document.getElementById('subToolbar');
+        
+        function updateSubToolbar() {
+            if (currentMode === 'NODE') {
+                subToolbar.innerHTML = `
+                    <span style="font-size: 12px; color: #ccc;">NODE TYPE:</span>
+                    <button class="sub-btn ${activeNodeType==='trail'?'active':''}" onclick="setActiveNodeType('trail')" style="background: ${activeNodeType==='trail'?'#0078FF':''}">Trail</button>
+                    <button class="sub-btn ${activeNodeType==='trailhead'?'active':''}" onclick="setActiveNodeType('trailhead')" style="background: ${activeNodeType==='trailhead'?'#28a745':''}">Trailhead</button>
+                    <button class="sub-btn ${activeNodeType==='offroad'?'active':''}" onclick="setActiveNodeType('offroad')" style="background: ${activeNodeType==='offroad'?'#000000':''}">Offroad</button>
+                `;
+            } else if (currentMode === 'EDGE') {
+                subToolbar.innerHTML = `
+                    <span style="font-size: 12px; color: #ccc;">PATH TYPE:</span>
+                    <button class="sub-btn ${activeEdgeType==='walk'?'active':''}" onclick="setActiveEdgeType('walk')" style="color: ${activeEdgeType==='walk'?'black':'white'}; background: ${activeEdgeType==='walk'?'#FFD700':''}">Walk (Yellow)</button>
+                    <button class="sub-btn ${activeEdgeType==='drive'?'active':''}" onclick="setActiveEdgeType('drive')" style="background: ${activeEdgeType==='drive'?'#8B4513':''}">Drive (Brown)</button>
+                `;
+            } else if (currentMode === 'DELETE') {
+                 if (!selectedElementForEdit) {
+                     subToolbar.innerHTML = `<span style="font-size: 12px; color: #ccc;">Select a node or edge on the map to edit or erase it.</span>`;
+                 } else {
+                     if (selectedElementForEdit.type === 'node') {
+                         const nId = selectedElementForEdit.id;
+                         const currType = graphData.nodes[nId].type;
+                         subToolbar.innerHTML = `
+                            <span style="font-size: 12px; color: #ccc;">EDITING NODE ${nId} (${currType.toUpperCase()}):</span>
+                            <button class="sub-btn" onclick="changeNodeType('${nId}', 'trail')">Set Trail</button>
+                            <button class="sub-btn" onclick="changeNodeType('${nId}', 'trailhead')">Set Trailhead</button>
+                            <button class="sub-btn" onclick="changeNodeType('${nId}', 'offroad')">Set Offroad</button>
+                            <button class="sub-btn" style="background:#dc3545; border-color:#dc3545; margin-left: 15px;" onclick="eraseNode('${nId}')">🗑️ Erase Node</button>
+                         `;
+                     } else if (selectedElementForEdit.type === 'edge') {
+                         const {start, end} = selectedElementForEdit;
+                         const currType = graphData.edges[start][end];
+                         subToolbar.innerHTML = `
+                            <span style="font-size: 12px; color: #ccc;">EDITING EDGE ${start}-${end} (${currType.toUpperCase()}):</span>
+                            <button class="sub-btn" onclick="changeEdgeType('${start}', '${end}', 'walk')">Set Walk</button>
+                            <button class="sub-btn" onclick="changeEdgeType('${start}', '${end}', 'drive')">Set Drive</button>
+                            <button class="sub-btn" style="background:#dc3545; border-color:#dc3545; margin-left: 15px;" onclick="eraseEdge('${start}', '${end}')">🗑️ Erase Edge</button>
+                         `;
+                     }
+                 }
+            } else {
+                subToolbar.innerHTML = `<span style="font-size: 12px; color: #ccc;">Select a point on the map to add a POI tag.</span>`;
+            }
+        }
+
+        window.setActiveNodeType = (type) => { activeNodeType = type; updateSubToolbar(); };
+        window.setActiveEdgeType = (type) => { activeEdgeType = type; updateSubToolbar(); };
+
+        // --- EDIT MODE LOGIC & VALIDATION ---
+        window.changeNodeType = function(nodeId, newType) {
+            graphData.nodes[nodeId].type = newType;
+            // VALIDATION: If downgraded to a trail, connected drive edges must become walk edges
+            if (newType === 'trail') {
+                for (let targetId in graphData.edges[nodeId]) {
+                    if (graphData.edges[nodeId][targetId] === 'drive') {
+                        graphData.edges[nodeId][targetId] = 'walk';
+                        graphData.edges[targetId][nodeId] = 'walk'; // Bidirectional update
+                    }
+                }
+            }
+            redrawMap(); updateSubToolbar();
+        };
+
+        window.changeEdgeType = function(start, end, newType) {
+            if (newType === 'drive') {
+                const startType = graphData.nodes[start].type;
+                const endType = graphData.nodes[end].type;
+                if ((startType !== 'offroad' && startType !== 'trailhead') || (endType !== 'offroad' && endType !== 'trailhead')) {
+                    alert("Validation Error: 'Drive' edges can only connect Offroad or Trailhead nodes.\nChange the node types first.");
+                    return;
+                }
+            }
+            graphData.edges[start][end] = newType;
+            graphData.edges[end][start] = newType;
+            redrawMap(); updateSubToolbar();
+        };
+
+        window.eraseNode = function(nodeId) {
+            delete graphData.nodes[nodeId];
+            for (const nId in graphData.edges) {
+                delete graphData.edges[nId][nodeId]; // Remove references from neighbors
+            }
+            delete graphData.edges[nodeId];
+            graphData.locations = graphData.locations.filter(loc => loc.node_id !== nodeId);
+            selectedElementForEdit = null;
+            document.getElementById('status').innerText = `Erased ${nodeId}.`;
+            redrawMap(); updateSubToolbar();
+        };
+
+        window.eraseEdge = function(start, end) {
+            delete graphData.edges[start][end];
+            delete graphData.edges[end][start];
+            selectedElementForEdit = null;
+            document.getElementById('status').innerText = `Severed edge between ${start} and ${end}.`;
+            redrawMap(); updateSubToolbar();
+        };
+
+        // --- THE RENDER ENGINE ---
+        function redrawMap() {
+            drawnItems.clearLayers(); 
+            const drawnEdges = new Set();
+
+            for (const nodeId in graphData.edges) {
+                const node = graphData.nodes[nodeId];
+                if (!node) continue; 
+
+                for (const [targetId, edgeType] of Object.entries(graphData.edges[nodeId])) {
+                    const edgeKey = [nodeId, targetId].sort().join('-');
+                    if (!drawnEdges.has(edgeKey)) {
+                        drawnEdges.add(edgeKey);
+                        const targetNode = graphData.nodes[targetId];
+                        
+                        const isSelectedEdge = selectedElementForEdit && selectedElementForEdit.type === 'edge' && 
+                            ((selectedElementForEdit.start === nodeId && selectedElementForEdit.end === targetId) ||
+                             (selectedElementForEdit.start === targetId && selectedElementForEdit.end === nodeId));
+                        
+                        const edgeColor = edgeType === 'drive' ? '#8B4513' : '#FFD700';
+                        const edgeDash = edgeType === 'walk' ? '5, 5' : '';
+                        const line = L.polyline([[node.lat, node.lng], [targetNode.lat, targetNode.lng]], { 
+                            color: edgeColor, 
+                            weight: isSelectedEdge ? 8 : 4,
+                            dashArray: edgeDash
+                        });
+                        
+                        line.on('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            if (currentMode === 'DELETE') {
+                                selectedElementForEdit = { type: 'edge', start: nodeId, end: targetId };
+                                redrawMap(); updateSubToolbar();
+                            }
+                        });
+                        drawnItems.addLayer(line);
+                    }
+                }
+            }
+
+            graphData.locations.forEach(loc => {
+                const poiMarker = L.circleMarker([loc.lat, loc.lng], { radius: 12, color: 'red', fillOpacity: 0.5 });
+                poiMarker.bindTooltip(loc.name, { direction: 'top', offset: [0, -10] });
+                poiMarker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    if (currentMode === 'DELETE') {
+                        graphData.locations = graphData.locations.filter(l => l.node_id !== loc.node_id);
+                        document.getElementById('status').innerText = `Removed POI tag: ${loc.name}`;
+                        redrawMap();
+                    } else { handleNodeClick(loc.node_id, {lat: loc.lat, lng: loc.lng}); }
+                });
+                drawnItems.addLayer(poiMarker);
+            });
+
+            for (const nodeId in graphData.nodes) {
+                const node = graphData.nodes[nodeId];
+                const isSelectedNode = selectedElementForEdit && selectedElementForEdit.type === 'node' && selectedElementForEdit.id === nodeId;
+                
+                let nColor = '#0078FF'; // Trail
+                if (node.type === 'trailhead') nColor = '#28a745';
+                if (node.type === 'offroad') nColor = '#000000';
+
+                const marker = L.circleMarker([node.lat, node.lng], { 
+                    radius: isSelectedNode ? 10 : 6, 
+                    color: nColor, 
+                    fillOpacity: 1 
+                });
+                
+                marker.bindTooltip(nodeId, { permanent: true, direction: 'right', offset: [5, 0] });
+                marker.on('click', (e) => handleNodeClick(nodeId, {lat: node.lat, lng: node.lng}));
+                drawnItems.addLayer(marker);
+            }
+        }
+
+        // --- MAP INTERACTION LOGIC ---
+        const setMode = (mode, statusText) => {
+            currentMode = mode;
+            edgeStartNode = null; 
+            selectedElementForEdit = null;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.replace('active-mode', 'inactive-mode'));
+            document.getElementById('btn' + mode.charAt(0) + mode.slice(1).toLowerCase()).classList.replace('inactive-mode', 'active-mode');
+            document.getElementById('status').innerText = statusText;
+            redrawMap(); updateSubToolbar();
+        };
+
+        document.getElementById('btnNode').onclick = () => setMode('NODE', 'Click map to place a node...');
+        document.getElementById('btnEdge').onclick = () => setMode('EDGE', 'Click a node to start a path...');
+        document.getElementById('btnPoi').onclick = () => setMode('POI', 'Click a node to turn it into a POI...');
+        document.getElementById('btnDelete').onclick = () => setMode('DELETE', 'Click an object to inspect or edit it...');
+
+        document.getElementById('btnClear').onclick = () => {
+            if (confirm("Are you sure you want to delete the entire map? This cannot be undone.")) {
+                graphData = { id: "custom_park", name: "Custom Built Park", mapSource: "Map Editor Tool", elevSource: "pending", nodes: {}, edges: {}, locations: [] };
+                nodeCounter = 1; edgeStartNode = null; selectedElementForEdit = null;
+                redrawMap(); updateSubToolbar();
+                document.getElementById('status').innerText = "Map completely wiped.";
+            }
+        };
+
+        map.on('click', (e) => {
+            if (currentMode !== 'NODE') return;
+            const nodeId = 'n' + nodeCounter++;
+            graphData.nodes[nodeId] = { lat: parseFloat(e.latlng.lat.toFixed(6)), lng: parseFloat(e.latlng.lng.toFixed(6)), elev: 0, type: activeNodeType };
+            graphData.edges[nodeId] = {}; 
+            redrawMap(); 
+        });
+
+        function handleNodeClick(nodeId, latlng) {
+            L.DomEvent.stopPropagation(event); 
+
+            if (currentMode === 'EDGE') {
+                if (!edgeStartNode) {
+                    edgeStartNode = { id: nodeId, latlng: latlng };
+                    document.getElementById('status').innerText = `Connecting ${nodeId} to...`;
+                } else {
+                    if (edgeStartNode.id === nodeId) return; 
+                    
+                    // Validation Check
+                    if (activeEdgeType === 'drive') {
+                        const startType = graphData.nodes[edgeStartNode.id].type;
+                        const endType = graphData.nodes[nodeId].type;
+                        if ((startType !== 'offroad' && startType !== 'trailhead') || (endType !== 'offroad' && endType !== 'trailhead')) {
+                            alert("Validation Error: 'Drive' edges can only connect Offroad or Trailhead nodes.\nChange the node types first.");
+                            edgeStartNode = null;
+                            document.getElementById('status').innerText = 'Click a node to start a path...';
+                            return;
+                        }
+                    }
+
+                    graphData.edges[edgeStartNode.id][nodeId] = activeEdgeType;
+                    graphData.edges[nodeId][edgeStartNode.id] = activeEdgeType;
+                    redrawMap();
+                    
+                    edgeStartNode = null;
+                    document.getElementById('status').innerText = 'Click a node to start a path...';
+                }
+            } 
+            else if (currentMode === 'POI') {
+                const poiName = prompt(`Enter a name for the POI at ${nodeId}:`);
+                if (poiName) {
+                    graphData.locations.push({
+                        name: poiName, node_id: nodeId, lat: parseFloat(latlng.lat.toFixed(6)), lng: parseFloat(latlng.lng.toFixed(6)),
+                        elev: 0, has_ar: true, ar_type: "text", ar_content: poiName
+                    });
+                    redrawMap();
+                    document.getElementById('status').innerText = `Added POI: ${poiName} at ${nodeId}`;
+                }
+            }
+            else if (currentMode === 'DELETE') {
+                selectedElementForEdit = { type: 'node', id: nodeId };
+                redrawMap(); updateSubToolbar();
+            }
+        }
+
+        // === SYSTEM: DYNAMIC GEOJSON POI IMPORTER ===
+        const fileInputPoi = document.getElementById('import-poi-file');
+        const btnImportPoi = document.getElementById('btn-import-poi');
+        const importModal = document.getElementById('import-modal');
+        const nameSelect = document.getElementById('import-name-field');
+        const btnConfirmImport = document.getElementById('btn-confirm-import');
+        const btnCancelImport = document.getElementById('btn-cancel-import');
+
+        let pendingImportData = null; // Temporarily holds the file in memory
+
+        // Open the file browser when the button is clicked
+        btnImportPoi.addEventListener('click', () => fileInputPoi.click());
+
+        // Read the file and scan the schema
+        fileInputPoi.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    if (!data.features || data.features.length === 0) {
+                        throw new Error("Invalid GeoJSON or empty feature list.");
+                    }
+
+                    // Extract the column headers from the first feature's properties
+                    const firstFeature = data.features[0];
+                    const keys = Object.keys(firstFeature.properties || {});
+
+                    if (keys.length === 0) throw new Error("No properties found in this dataset.");
+
+                    // Populate the dropdown menu with the discovered headers
+                    nameSelect.innerHTML = '';
+                    keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = key;
+                        nameSelect.appendChild(option);
+                    });
+
+                    // Save data to memory and show the modal
+                    pendingImportData = data;
+                    importModal.style.display = 'block';
+
+                } catch (err) {
+                    alert("Error parsing file: " + err.message);
+                }
+                fileInputPoi.value = ''; // Reset the input for future uploads
+            };
+            reader.readAsText(file);
+        });
+
+        // Handle Cancel
+        btnCancelImport.addEventListener('click', () => {
+            importModal.style.display = 'none';
+            pendingImportData = null;
+        });
+
+        // Handle Confirmation & Execute the 1:1 Import
+        btnConfirmImport.addEventListener('click', () => {
+            if (!pendingImportData) return;
+            
+            const selectedNameKey = nameSelect.value;
+            let importedCount = 0;
+
+            pendingImportData.features.forEach(feature => {
+                // Ignore any lines or polygons; only import strict Points (POIs)
+                if (feature.geometry && feature.geometry.type === 'Point') {
+                    const coords = feature.geometry.coordinates;
+                    const lng = coords[0];
+                    const lat = coords[1];
+                    
+                    // Extract the name using the exact column the user selected
+                    const nodeName = feature.properties[selectedNameKey] || "Unnamed POI";
+                    const nodeId = 'n' + nodeCounter++;
+
+                    // INJECT INTO EDITOR'S MASTER GRAPH
+                    // Set as 'trailhead' so it acts as a routable POI anchor
+                    graphData.nodes[nodeId] = {
+                        lat: parseFloat(lat.toFixed(6)),
+                        lng: parseFloat(lng.toFixed(6)),
+                        elev: 0,
+                        type: 'trailhead' 
+                    };
+                    graphData.edges[nodeId] = {};
+                    
+                    // Add it directly to the red POI pins list
+                    graphData.locations.push({
+                        name: nodeName,
+                        node_id: nodeId,
+                        lat: parseFloat(lat.toFixed(6)),
+                        lng: parseFloat(lng.toFixed(6)),
+                        elev: 0,
+                        has_ar: true,
+                        ar_type: "text",
+                        ar_content: nodeName
+                    });
+                    
+                    importedCount++;
+                }
+            });
+
+            // Cleanup UI
+            importModal.style.display = 'none';
+            pendingImportData = null;
+            redrawMap(); // Render the new nodes on the screen
+            
+            // NEW: Snap the camera to the newly imported points so we can actually see them!
+            const bounds = [];
+            for (let n in graphData.nodes) bounds.push([graphData.nodes[n].lat, graphData.nodes[n].lng]);
+            if (bounds.length > 0) map.fitBounds(bounds, {padding: [50, 50]});
+
+            document.getElementById('status').innerText = `✅ Imported ${importedCount} POIs.`;
+        });
+
+        // === SYSTEM: IMPORT GPS PATH (LINESTRING) ===
+        const fileInputPath = document.getElementById('import-path-file');
+        const btnImportPath = document.getElementById('btn-import-path');
+
+        btnImportPath.addEventListener('click', () => fileInputPath.click());
+
+        fileInputPath.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    let importedNodes = 0;
+
+                    data.features.forEach(feature => {
+                        // Look specifically for continuous paths, not isolated points
+                        if (feature.geometry && feature.geometry.type === 'LineString') {
+                            const coords = feature.geometry.coordinates;
+                            let prevNodeId = null;
+
+                            coords.forEach(coord => {
+                                // GeoJSON stores coordinates as [Longitude, Latitude, Altitude]
+                                const lng = coord[0];
+                                const lat = coord[1];
+                                const altMeters = coord[2] || 0; 
+
+                                const nodeId = 'n' + nodeCounter++;
+                                
+                                // 1. Create the node on the graph (converting alt to feet)
+                                graphData.nodes[nodeId] = {
+                                    lat: parseFloat(lat.toFixed(6)),
+                                    lng: parseFloat(lng.toFixed(6)),
+                                    elev: parseFloat((altMeters * 3.28084).toFixed(2)), 
+                                    type: 'trail'
+                                };
+                                graphData.edges[nodeId] = {};
+
+                                // 2. Automatically draw a 'walk' edge to the previous node
+                                if (prevNodeId) {
+                                    graphData.edges[prevNodeId][nodeId] = 'walk';
+                                    graphData.edges[nodeId][prevNodeId] = 'walk';
+                                }
+
+                                prevNodeId = nodeId;
+                                importedNodes++;
+                            });
+                        }
+                    });
+
+                    // Update the visual canvas
+                    redrawMap();
+                    
+                    // Snap the camera to the new trail
+                    const bounds = [];
+                    for (let n in graphData.nodes) bounds.push([graphData.nodes[n].lat, graphData.nodes[n].lng]);
+                    if (bounds.length > 0) map.fitBounds(bounds, {padding: [50, 50]});
+
+                    document.getElementById('status').innerText = `✅ Imported trail with ${importedNodes} nodes.`;
+
+                } catch (err) {
+                    alert("Error importing path: " + err.message);
+                }
+                fileInputPath.value = ''; // Reset input
+            };
+            reader.readAsText(file);
+        });
+
+        // --- EXPORT LOGIC ---
+        document.getElementById('btnExport').onclick = async () => {
+            const btn = document.getElementById('btnExport');
+            const status = document.getElementById('status');
+            const elevSource = document.getElementById('elevSource').value;
+            
+            btn.disabled = true; 
+            
+            let fileNameInput = document.getElementById('fileName').value.trim() || 'custom_park';
+            graphData.id = fileNameInput; 
+            graphData.name = fileNameInput.replace(/_/g, ' ').toUpperCase(); 
+            graphData.elevSource = elevSource === 'OM' ? 'Open-Meteo' : 'USGS';
+            const finalFileName = fileNameInput.endsWith('.json') ? fileNameInput : fileNameInput + '.json';
+            const nodeIds = Object.keys(graphData.nodes);
+
+            if (nodeIds.length > 0) {
+                if (elevSource === 'OM') {
+                    const CHUNK_SIZE = 100;
+                    for (let i = 0; i < nodeIds.length; i += CHUNK_SIZE) {
+                        const chunkIds = nodeIds.slice(i, i + CHUNK_SIZE);
+                        const endNum = Math.min(i + CHUNK_SIZE, nodeIds.length);
+                        status.innerText = `Fetching Open-Meteo Elev: ${i + 1}-${endNum} of ${nodeIds.length}...`;
+                        const lats = chunkIds.map(id => graphData.nodes[id].lat).join(',');
+                        const lngs = chunkIds.map(id => graphData.nodes[id].lng).join(',');
+                        try {
+                            const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
+                            const data = await res.json();
+                            if (data && data.elevation) {
+                                chunkIds.forEach((id, index) => { graphData.nodes[id].elev = parseFloat((data.elevation[index] * 3.28084).toFixed(2)); });
+                            }
+                        } catch (e) {}
+                    }
+                } 
+                else if (elevSource === 'USGS') {
+                    const CHUNK_SIZE = 10; 
+                    let usgsFailed = false;
+
+                    for (let i = 0; i < nodeIds.length; i += CHUNK_SIZE) {
+                        if (usgsFailed) break;
+                        const chunkIds = nodeIds.slice(i, i + CHUNK_SIZE);
+                        const endNum = Math.min(i + CHUNK_SIZE, nodeIds.length);
+                        status.innerText = `Fetching USGS Elev: ${i + 1}-${endNum} of ${nodeIds.length}...`;
+                        
+                        await Promise.all(chunkIds.map(async (nodeId) => {
+                            if (usgsFailed) return;
+                            const node = graphData.nodes[nodeId];
+                            try {
+                                const usgsRes = await fetch(`https://epqs.nationalmap.gov/v1/json?x=${node.lng}&y=${node.lat}&units=Meters`);
+                                if (!usgsRes.ok) throw new Error("HTTP Error");
+                                const usgsData = await usgsRes.json();
+                                if (usgsData && usgsData.value !== undefined && usgsData.value !== "-1000000") {
+                                    node.elev = parseFloat((usgsData.value * 3.28084).toFixed(2));
+                                } else { throw new Error("Invalid Data"); }
+                            } catch(e) { usgsFailed = true; }
+                        }));
+
+                        if (usgsFailed) {
+                            alert("Cannot retrieve data from USGS.\n\nPlease verify you are mapping within the United States or switch to the Open-Meteo Global engine.");
+                            btn.disabled = false; status.innerText = "Export aborted: USGS Failure."; return; 
+                        }
+                        await new Promise(r => setTimeout(r, 300));
+                    }
+                }
+            }
+
+            status.innerText = "Syncing POI data...";
+            graphData.locations.forEach(loc => {
+                if (loc.node_id && graphData.nodes[loc.node_id]) { loc.elev = graphData.nodes[loc.node_id].elev; }
+            });
+
+            status.innerText = "Formatting JSON...";
+
+            let rawJson = JSON.stringify(graphData, null, 2);
+            // Compact the node objects to keep the JSON file small and readable
+            let compactJson = rawJson
+                .replace(/\[\n\s+([^\]]+?)\n\s+\]/g, (match, content) => {
+                    if (content.includes('{')) return match; 
+                    return '[' + content.replace(/\n\s+/g, ' ') + ']'; 
+                })
+                .replace(/\{\n\s+"lat":\s*([0-9.-]+),\n\s+"lng":\s*([0-9.-]+),\n\s+"elev":\s*([0-9.-]+),\n\s+"type":\s*"([^"]+)"\n\s+\}/g, '{"lat": $1, "lng": $2, "elev": $3, "type": "$4"}');
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(compactJson);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", finalFileName);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+
+            btn.disabled = false;
+            status.innerText = "✅ Export Complete!";
+        };
+
+        // --- IMPORT LOGIC ---
+        document.getElementById('btnImport').onclick = () => document.getElementById('fileImport').click();
+        
+        document.getElementById('fileImport').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    
+                    // Basic validation to ensure it's our native format
+                    if (!importedData.nodes || !importedData.edges) {
+                        throw new Error("Invalid format. Missing nodes or edges.");
+                    }
+                    
+                    // Overwrite the current graph memory
+                    graphData = importedData;
+                    
+                    // CRITICAL FIX: Update the node counter so new nodes don't overwrite old ones!
+                    const nodeKeys = Object.keys(graphData.nodes);
+                    if (nodeKeys.length > 0) {
+                        const maxNum = Math.max(...nodeKeys.map(k => parseInt(k.replace('n', '')) || 0));
+                        nodeCounter = maxNum + 1;
+                    } else {
+                        nodeCounter = 1;
+                    }
+                    
+                    // Update the UI Filename box
+                    document.getElementById('fileName').value = graphData.id || 'imported_park';
+                    
+                    // Redraw the map and snap the camera to the loaded data
+                    redrawMap();
+                    
+                    const bounds = [];
+                    for (let n in graphData.nodes) bounds.push([graphData.nodes[n].lat, graphData.nodes[n].lng]);
+                    if (bounds.length > 0) map.fitBounds(bounds, {padding: [50, 50]});
+                    
+                    document.getElementById('status').innerText = `✅ Loaded ${nodeKeys.length} nodes successfully.`;
+                    
+                } catch (err) {
+                    alert("Error loading file. Please ensure it is a valid JSON generated by this Map Editor.\n\nDetails: " + err.message);
+                }
+                
+                // Reset the input so the same file can be loaded again if needed
+                e.target.value = ''; 
+            };
+            reader.readAsText(file);
+        });
+
+        // === SYSTEM: MAP SEARCH ENGINE (NOMINATIM) ===
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsBox = document.getElementById('suggestions');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout); 
+            const query = e.target.value.trim();
+            
+            // Only search if the user has typed at least 3 characters
+            if (query.length < 3) { 
+                suggestionsBox.style.display = 'none';
+                return;
+            }
+            
+            // 800ms debounce to respect the free API limits
+            searchTimeout = setTimeout(async () => {
+                suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:#888; pointer-events:none;">Searching...</div>';
+                suggestionsBox.style.display = 'flex';
+                
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+                    
+                    suggestionsBox.innerHTML = ''; 
+                    
+                    if (data.length > 0) {
+                        data.forEach(place => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = place.display_name;
+                            
+                            // When the user clicks a result, fly the camera there
+                            div.onclick = () => {
+                                const lat = parseFloat(place.lat);
+                                const lon = parseFloat(place.lon);
+                                
+                                map.setView([lat, lon], 14); // Snap camera
+                                
+                                // Clean up UI
+                                searchInput.value = '';
+                                suggestionsBox.style.display = 'none';
+                                searchInput.blur(); 
+                            };
+                            suggestionsBox.appendChild(div);
+                        });
+                    } else {
+                        suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:#888; pointer-events:none;">No results found</div>';
+                    }
+                } catch (err) {
+                    suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:#d9534f; pointer-events:none;">Search temporarily offline</div>';
+                }
+            }, 800); 
+        });
+
+        // Hide suggestions if the user clicks anywhere else on the map
+        map.on('click', () => {
+            suggestionsBox.style.display = 'none';
+        });
+
+        // Initialize Toolbar
+        updateSubToolbar();
+    </script>
+</body>
+</html>
