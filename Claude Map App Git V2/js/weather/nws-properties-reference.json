@@ -1,0 +1,485 @@
+[
+  {
+    "property": "apparentTemperature",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "atmosphericDispersionIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "ceilingHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "davisStabilityIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "detailedForecast",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "dewpoint",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "dispersionIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "endTime",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "grasslandFireDangerIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "hainesIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "hazards",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "heatIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "heatRisk",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "iceAccumulation",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "icon",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "isDaytime",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "lightningActivityLevel",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "lowVisibilityOccurrenceRiskIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "maxTemperature",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "minTemperature",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "mixingHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "name",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "number",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf15mphWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf20mphWindGusts",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf25mphWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf30mphWindGusts",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf35mphWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf40mphWindGusts",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf45mphWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf50mphWindGusts",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "potentialOf60mphWindGusts",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "pressure",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "primarySwellDirection",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "primarySwellHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "probabilityOfHurricaneWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "probabilityOfPrecipitation",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✓"
+  },
+  {
+    "property": "probabilityOfThunder",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "probabilityOfTropicalStormWinds",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "quantitativePrecipitation",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "redFlagThreatIndex",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "relativeHumidity",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "secondarySwellDirection",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "secondarySwellHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "shortForecast",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "skyCover",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "snowLevel",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "snowfallAmount",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "stability",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "startTime",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "temperature",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✓"
+  },
+  {
+    "property": "temperatureTrend",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "temperatureUnit",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✗"
+  },
+  {
+    "property": "transportWindDirection",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "transportWindSpeed",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "twentyFootWindDirection",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "twentyFootWindSpeed",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "visibility",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "waveDirection",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "waveHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "wavePeriod",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "wavePeriod2",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  },
+  {
+    "property": "weather",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "wetBulbGlobeTemperature",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "windChill",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "windDirection",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✓"
+  },
+  {
+    "property": "windGust",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✓"
+  },
+  {
+    "property": "windSpeed",
+    "current": "✓",
+    "24hr": "✓",
+    "7day": "✓",
+    "gridData": "✓"
+  },
+  {
+    "property": "windWaveHeight",
+    "current": "✗",
+    "24hr": "✗",
+    "7day": "✗",
+    "gridData": "✗"
+  }
+]
